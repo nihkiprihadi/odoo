@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PTN Notulen Meeting</title>
+    <style>
+        :root {
+            --bg: #f5f2ea;
+            --paper: #fffdf8;
+            --ink: #1e293b;
+            --muted: #5b6472;
+            --line: #d9d2c3;
+            --accent: #0f766e;
+            --accent-soft: #d9f2ef;
+            --warm: #b45309;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(180deg, #f7f3ea 0%, #efe9dd 100%);
+            color: var(--ink);
+        }
+
+        .wrap {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 40px 24px 56px;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 24px;
+            align-items: stretch;
+        }
+
+        .panel {
+            background: rgba(255, 253, 248, 0.96);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            box-shadow: 0 14px 36px rgba(30, 41, 59, 0.08);
+        }
+
+        .hero-copy {
+            padding: 34px 34px 30px;
+        }
+
+        .eyebrow {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent);
+            background: var(--accent-soft);
+        }
+
+        h1 {
+            margin: 18px 0 12px;
+            font-size: 40px;
+            line-height: 1.05;
+            letter-spacing: -0.03em;
+        }
+
+        .lead {
+            margin: 0;
+            font-size: 17px;
+            line-height: 1.65;
+            color: var(--muted);
+        }
+
+        .hero-points {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .point {
+            padding: 14px 16px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: #fff;
+        }
+
+        .point strong {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .point span {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .hero-card {
+            padding: 26px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background:
+                radial-gradient(circle at top right, rgba(15, 118, 110, 0.12), transparent 42%),
+                linear-gradient(180deg, #fffefb 0%, #f7f0e4 100%);
+        }
+
+        .doc {
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            background: var(--paper);
+            overflow: hidden;
+        }
+
+        .doc-head {
+            padding: 16px 18px 12px;
+            border-bottom: 1px solid var(--line);
+            background: #faf7f0;
+            text-align: center;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+        }
+
+        .doc-body {
+            padding: 16px 18px 18px;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .meta-line {
+            display: grid;
+            grid-template-columns: 92px 1fr;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .topic {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--line);
+        }
+
+        .topic strong {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .topic ul {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        .topic li {
+            margin-bottom: 6px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .stat {
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid var(--line);
+        }
+
+        .stat b {
+            display: block;
+            font-size: 22px;
+            color: var(--warm);
+        }
+
+        .stat span {
+            font-size: 12px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .section {
+            margin-top: 26px;
+            padding: 30px 34px;
+        }
+
+        h2 {
+            margin: 0 0 8px;
+            font-size: 28px;
+            letter-spacing: -0.02em;
+        }
+
+        .section p {
+            margin: 0 0 18px;
+            color: var(--muted);
+            line-height: 1.65;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .feature {
+            padding: 18px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+        }
+
+        .feature h3 {
+            margin: 0 0 8px;
+            font-size: 16px;
+        }
+
+        .feature p {
+            margin: 0;
+            font-size: 14px;
+        }
+
+        .workflow {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .step {
+            position: relative;
+            padding: 18px 18px 18px 54px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+        }
+
+        .step-num {
+            position: absolute;
+            left: 16px;
+            top: 16px;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 800;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .step strong {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 15px;
+        }
+
+        .step span {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .footer-note {
+            margin-top: 26px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        @media (max-width: 900px) {
+
+            .hero,
+            .features,
+            .workflow,
+            .hero-points,
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 34px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <section class="hero">
+            <div class="panel hero-copy">
+                <span class="eyebrow">PTN Productivity</span>
+                <h1>PTN Notulen Meeting</h1>
+                <p class="lead">
+                    Modul notulen meeting Odoo untuk mencatat pembahasan rapat, histori perubahan tiap item,
+                    workflow approval, carry forward meeting lanjutan, serta output presentable ke Print Web, PDF,
+                    Word, dan Excel.
+                </p>
+
+                <div class="hero-points">
+                    <div class="point">
+                        <strong>Structured Minutes</strong>
+                        <span>Section, topik, sub-item, checklist update, note, dan tabel fleksibel dalam satu alur
+                            input.</span>
+                    </div>
+                    <div class="point">
+                        <strong>Action Tracking</strong>
+                        <span>Status, target, owner, dan perubahan progres dapat ditelusuri lintas meeting.</span>
+                    </div>
+                    <div class="point">
+                        <strong>Approval Ready</strong>
+                        <span>Submit approval ke approver/manager divisi lengkap dengan notifikasi email.</span>
+                    </div>
+                    <div class="point">
+                        <strong>Follow Up Flow</strong>
+                        <span>Buat meeting lanjutan dan bawa open item otomatis tanpa kehilangan struktur
+                            parent-child.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel hero-card">
+                <div class="doc">
+                    <div class="doc-head">NOTULEN RAPAT</div>
+                    <div class="doc-body">
+                        <div class="meta-line"><span>Agenda</span><strong>Rapat Mingguan Internal IT</strong></div>
+                        <div class="meta-line"><span>Tanggal</span><strong>Senin, 05 Mei 2026</strong></div>
+                        <div class="meta-line"><span>Notulis</span><strong>PTN Team</strong></div>
+
+                        <div class="topic">
+                            <strong>1. Infrastruktur Email</strong>
+                            <ul>
+                                <li>Status hardware dan storage terpantau rapi</li>
+                                <li>Checklist update dan note per sub-item</li>
+                                <li>Follow-up meeting terbawa otomatis</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats">
+                    <div class="stat">
+                        <b>4x</b>
+                        <span>Export Output</span>
+                    </div>
+                    <div class="stat">
+                        <b>100%</b>
+                        <span>Traceable Items</span>
+                    </div>
+                    <div class="stat">
+                        <b>1 Click</b>
+                        <span>Follow Up</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel section">
+            <h2>Fitur Utama</h2>
+            <p>
+                Dirancang untuk rapat internal yang butuh dokumentasi formal sekaligus monitoring progres yang mudah
+                dibaca kembali pada meeting berikutnya.
+            </p>
+            <div class="features">
+                <div class="feature">
+                    <h3>Pembahasan Bertingkat</h3>
+                    <p>Topik utama, sub-item, bullet, checklist update/note, dan tabel fleksibel bisa dicampur dalam
+                        satu notulen.</p>
+                </div>
+                <div class="feature">
+                    <h3>Approval & Access</h3>
+                    <p>Akses dibatasi berdasarkan pembuat, notulis, peserta, approver, atau manager divisi yang relevan.
+                    </p>
+                </div>
+                <div class="feature">
+                    <h3>Histori Perubahan</h3>
+                    <p>Setiap item bisa dibandingkan dengan meeting sebelumnya untuk melihat status dan target yang
+                        berubah.</p>
+                </div>
+                <div class="feature">
+                    <h3>Carry Forward Otomatis</h3>
+                    <p>Open item yang belum selesai dibawa ke meeting lanjutan tanpa kehilangan relasi parent-child.</p>
+                </div>
+                <div class="feature">
+                    <h3>Print Web Friendly</h3>
+                    <p>View khusus untuk rapat/proyektor dengan zoom, fullscreen, print, dan download PDF.</p>
+                </div>
+                <div class="feature">
+                    <h3>Export Multi Format</h3>
+                    <p>Dokumen bisa dibagikan ke PDF, Word, dan Excel untuk dokumentasi, distribusi, atau arsip.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel section">
+            <h2>Workflow Ringkas</h2>
+            <p>
+                Alur kerja dibuat sederhana agar tim bisa fokus pada isi rapat, bukan pada administrasi dokumen.
+            </p>
+            <div class="workflow">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <strong>Buat Notulen</strong>
+                    <span>Isi header meeting, peserta, notulis, dan struktur pembahasan.</span>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <strong>Catat Action</strong>
+                    <span>Isi target, status, checklist update, note, dan tabel jika diperlukan.</span>
+                </div>
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <strong>Submit Approval</strong>
+                    <span>Kirim notulen ke approver yang ditentukan, termasuk notifikasi email.</span>
+                </div>
+                <div class="step">
+                    <div class="step-num">4</div>
+                    <strong>Follow Up Meeting</strong>
+                    <span>Buat meeting lanjutan dan teruskan open item untuk monitoring berikutnya.</span>
+                </div>
+            </div>
+        </section>
+
+        <div class="footer-note">
+            PTN Notulen Meeting for Odoo 19
+        </div>
+    </div>
+</body>
+
+</html>

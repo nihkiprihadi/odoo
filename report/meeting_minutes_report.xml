@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="paperformat_np_meeting_minutes" model="report.paperformat">
+        <field name="name">Meeting Minutes A4</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">12</field>
+        <field name="margin_bottom">10</field>
+        <field name="margin_left">10</field>
+        <field name="margin_right">10</field>
+        <field name="header_line" eval="False"/>
+        <field name="dpi">90</field>
+    </record>
+
+    <record id="action_report_np_meeting_minutes" model="ir.actions.report">
+        <field name="name">Print Notulen Meeting</field>
+        <field name="model">np.meeting.minutes</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">np_meeting_minutes.report_np_meeting_minutes_document</field>
+        <field name="report_file">np_meeting_minutes.report_np_meeting_minutes_document</field>
+        <field name="print_report_name">'Notulen - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_np_meeting_minutes"/>
+        <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="paperformat_np_meeting_minutes"/>
+    </record>
+
+    <template id="report_np_meeting_minutes_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.basic_layout">
+                    <div class="page">
+                        <style>
+                            .np-mm-report { font-family: Arial, sans-serif; color: #000000; font-size: 10pt; line-height: 1.32; }
+                            .np-mm-title { text-align: center; font-weight: 700; font-size: 17pt; margin: 0 0 4px; text-transform: uppercase; }
+                            .np-mm-page { text-align: right; font-size: 9pt; margin: 0 0 10px; }
+                            .np-mm-meta { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+                            .np-mm-meta td { padding: 1px 4px; vertical-align: top; }
+                            .np-mm-meta__label { width: 19%; font-weight: 400; }
+                            .np-mm-meta__value { width: 31%; }
+                            .np-mm-participants { margin: 4px 0 10px; line-height: 1.45; }
+                            .np-mm-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+                            .np-mm-table th, .np-mm-table td { border: 1px solid #000000; padding: 4px 5px; vertical-align: top; }
+                            .np-mm-table th { background: #ffffff; text-align: center; font-weight: 700; }
+                            .np-mm-section td { font-weight: 700; text-transform: uppercase; background: #ffffff; }
+                            .np-mm-section__desc { display: block; margin-top: 3px; font-weight: 400; text-transform: none; white-space: pre-line; }
+                            .np-mm-no { width: 5%; text-align: center; }
+                            .np-mm-owner { width: 11%; }
+                            .np-mm-target { width: 11%; }
+                            .np-mm-status { width: 11%; text-align: center; }
+                            .np-mm-cell-pre { white-space: pre-line; }
+                            .np-mm-row--parent td { background: #fcfcfc; }
+                            .np-mm-parent-title { font-weight: 700; text-transform: uppercase; margin-bottom: 1px; }
+                            .np-mm-parent-note { white-space: pre-line; }
+                            .np-mm-child td { border-top: 0 !important; border-bottom: 0 !important; }
+                            .np-mm-child--last td { border-bottom: 1px solid #000 !important; }
+                            .np-mm-outline { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; margin-top: 0; }
+                            .np-mm-outline td { border: 0 !important; outline: 0 !important; box-shadow: none !important; padding: 0; vertical-align: top; }
+                            .np-mm-outline__marker { width: 18px; font-weight: 700; }
+                            .np-mm-outline__topic { font-weight: 700; }
+                            .np-mm-outline__bulletrow { display: table; width: 100%; table-layout: fixed; border: 0 !important; outline: 0 !important; margin: 0; }
+                            .np-mm-outline__bulletmarker { display: table-cell; width: 10px; padding-right: 6px; padding-top: 1px; vertical-align: top; line-height: 1.2; }
+                            .np-mm-outline__bullettext { display: table-cell; white-space: pre-line; vertical-align: top; line-height: 1.35; }
+                            .np-mm-outline__text { white-space: pre-line; margin-top: 2px; }
+                            .np-mm-gap { display: block; min-height: 16px; }
+                            .np-mm-progress { margin-top: 2px; white-space: pre-line; }
+                            .np-mm-checklist-row { display: table; width: 100%; table-layout: fixed; margin-top: 2px; }
+                            .np-mm-checklist-marker { display: table-cell; width: 14px; vertical-align: top; font-weight: 700; }
+                            .np-mm-checklist-text { display: table-cell; vertical-align: top; white-space: pre-line; }
+                            .np-mm-change { margin-top: 2px; font-size: 9pt; white-space: pre-line; }
+                            .np-mm-inner-table { width: 100%; border-collapse: collapse; margin: 6px 0 4px; table-layout: fixed; }
+                            .np-mm-inner-table th, .np-mm-inner-table td { border: 1px solid #000 !important; padding: 3px 5px !important; font-size: 9pt; text-transform: none; }
+                            .np-mm-inner-table th { font-weight: 700; text-align: center; }
+                            .np-mm-inner-table-title { font-weight: 700; margin: 5px 0 2px; text-transform: none; }
+                        </style>
+
+                        <div class="np-mm-report">
+                            <h2 class="np-mm-title">Notulen Rapat</h2>
+                            <p class="np-mm-page">Page <span class="page"/> of <span class="topage"/></p>
+
+                            <table class="np-mm-meta">
+                                <tr>
+                                    <td class="np-mm-meta__label">Agenda</td>
+                                    <td class="np-mm-meta__value">: <span t-esc="o.agenda or o.title or '-'"/></td>
+                                    <td class="np-mm-meta__label">Tempat</td>
+                                    <td class="np-mm-meta__value">: <span t-esc="o.location or '-'"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="np-mm-meta__label">Hari / Tanggal</td>
+                                    <td class="np-mm-meta__value">
+                                        : <span t-esc="o.get_meeting_date_display()"/>
+                                    </td>
+                                    <td class="np-mm-meta__label">Pukul</td>
+                                    <td class="np-mm-meta__value">: <span t-esc="o.get_meeting_time_display()"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="np-mm-meta__label">Notulis</td>
+                                    <td class="np-mm-meta__value">: <span t-esc="o.note_taker_id.name or '-'"/></td>
+                                    <td class="np-mm-meta__label"></td>
+                                    <td class="np-mm-meta__value"></td>
+                                </tr>
+                            </table>
+
+                            <div class="np-mm-participants">
+                                <strong>Peserta Rapat :</strong>
+                                <span t-esc="o.participant_names or '-'"/>
+                            </div>
+
+                            <table class="np-mm-table">
+                                <thead>
+                                    <tr>
+                                        <th class="np-mm-no">No</th>
+                                        <th>Pembahasan</th>
+                                        <th class="np-mm-owner">Oleh</th>
+                                        <th class="np-mm-target">Target</th>
+                                        <th class="np-mm-status">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="o.line_ids.sorted(key=lambda line: (line.sequence, line.id))" t-as="line">
+                                        <tr t-if="line.line_type == 'section'" class="np-mm-section">
+                                            <td colspan="5">
+                                                <span t-esc="line.section_title or '-'"/>
+                                                <span class="np-mm-section__desc" t-if="line.discussion" t-esc="line.discussion"/>
+                                            </td>
+                                        </tr>
+                                        <t t-if="line.line_type == 'item' and not line.parent_line_id">
+                                            <t t-set="outline_rows" t-value="line.get_report_outline_rows()"/>
+                                            <tr class="np-mm-row--parent">
+                                                <td class="np-mm-no">
+                                                    <span t-esc="line.number or ''"/>
+                                                </td>
+                                                <td>
+                                                    <div class="np-mm-parent-title">
+                                                        <span t-esc="line.topic or ''"/>
+                                                    </div>
+                                                    <div class="np-mm-parent-note" t-if="line.discussion">
+                                                        <span t-esc="line.discussion"/>
+                                                    </div>
+                                                    <t t-if="line.has_table_content()">
+                                                        <div class="np-mm-inner-table-title" t-if="line.table_title">
+                                                            <span t-esc="line.table_title"/>
+                                                        </div>
+                                                        <table class="np-mm-inner-table">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th t-foreach="line.get_active_table_columns()" t-as="column">
+                                                                        <span t-esc="column['label'] or ''"/>
+                                                                    </th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <tr t-foreach="line.get_table_rows()" t-as="table_row">
+                                                                    <td t-foreach="table_row['values']" t-as="cell">
+                                                                        <span t-esc="cell"/>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </t>
+                                                    <div class="np-mm-progress" t-if="line.get_update_items() or line.progress_note">
+                                                        <strong>Update:</strong>
+                                                        <br/>
+                                                        <t t-if="line.get_update_items()">
+                                                            <div class="np-mm-checklist-row" t-foreach="line.get_update_items()" t-as="update_item">
+                                                                <span class="np-mm-checklist-marker">✓</span>
+                                                                <span class="np-mm-checklist-text" t-esc="update_item"/>
+                                                            </div>
+                                                        </t>
+                                                        <t t-else="">
+                                                            <span t-esc="line.progress_note"/>
+                                                        </t>
+                                                    </div>
+                                                    <div class="np-mm-progress" t-if="line.get_note_items()">
+                                                        <strong>Note:</strong>
+                                                        <br/>
+                                                        <div class="np-mm-checklist-row" t-foreach="line.get_note_items()" t-as="note_item">
+                                                            <span class="np-mm-checklist-marker">✓</span>
+                                                            <span class="np-mm-checklist-text" t-esc="note_item"/>
+                                                        </div>
+                                                    </div>
+                                                    <div class="np-mm-change" t-if="line.change_summary and not outline_rows">
+                                                        <strong>Perubahan:</strong>
+                                                        <br/>
+                                                        <span t-esc="line.change_summary"/>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span t-esc="line.owner_names or ''"/>
+                                                </td>
+                                                <td><span t-esc="line._get_target_label() or ''"/></td>
+                                                <td><span t-esc="line._get_progress_status_label() or ''"/></td>
+                                            </tr>
+                                            <tr
+                                                t-if="outline_rows"
+                                                t-foreach="outline_rows"
+                                                t-as="row"
+                                                t-att-class="'np-mm-child%s' % (' np-mm-child--last' if row_last else '')"
+                                            >
+                                                <td class="np-mm-no"></td>
+                                                <td>
+                                                    <table class="np-mm-outline">
+                                                        <tr>
+                                                            <td
+                                                                class="np-mm-outline__marker"
+                                                                t-att-style="'width:%spx; padding-left:%spx; padding-right:%spx;' % (((10 if row['marker'] == '\\u2022' else 18)), ((6 + ((row['level'] - 2) * 8)) if row['marker'] == '\\u2022' else ((row['level'] - 1) * 14)), (2 if row['marker'] == '\\u2022' else 6))"
+                                                            >
+                                                                <span t-if="row['marker'] != '\u2022'" t-esc="row['marker']"/>
+                                                            </td>
+                                                            <td>
+                                                                <div class="np-mm-outline__topic" t-if="row['marker'] != '\u2022'">
+                                                                    <span t-esc="row['topic']"/>
+                                                                </div>
+                                                                <div class="np-mm-outline__bulletrow" t-if="row['marker'] == '\u2022'">
+                                                                    <span class="np-mm-outline__bulletmarker">&#8226;</span>
+                                                                    <span class="np-mm-outline__bullettext">
+                                                                        <span t-if="row['topic']" t-esc="row['topic']"/>
+                                                                        <span t-if="row['topic'] and row['discussion']"> </span>
+                                                                        <span t-if="row['discussion']" t-esc="row['discussion']"/>
+                                                                    </span>
+                                                                </div>
+                                                                <div class="np-mm-outline__text" t-if="row['discussion'] and row['marker'] != '\u2022'">
+                                                                    <span t-esc="row['discussion']"/>
+                                                                </div>
+                                                                <t t-if="row['has_table']">
+                                                                    <div class="np-mm-inner-table-title" t-if="row['table_title']">
+                                                                        <span t-esc="row['table_title']"/>
+                                                                    </div>
+                                                                    <table class="np-mm-inner-table">
+                                                                        <thead>
+                                                                            <tr>
+                                                                                <th t-foreach="row['table_columns']" t-as="column">
+                                                                                    <span t-esc="column['label'] or ''"/>
+                                                                                </th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            <tr t-foreach="row['table_rows']" t-as="table_row">
+                                                                                <td t-foreach="table_row['values']" t-as="cell">
+                                                                                    <span t-esc="cell"/>
+                                                                                </td>
+                                                                            </tr>
+                                                                        </tbody>
+                                                                    </table>
+                                                                </t>
+                                                                <div class="np-mm-progress" t-if="row['update_items'] or row['progress_note']" t-att-style="'padding-left:%spx;' % (14 if row['marker'] == '\u2022' else 2)">
+                                                                    <strong>Update:</strong>
+                                                                    <br/>
+                                                                    <t t-if="row['update_items']">
+                                                                        <div class="np-mm-checklist-row" t-foreach="row['update_items']" t-as="update_item">
+                                                                            <span class="np-mm-checklist-marker">✓</span>
+                                                                            <span class="np-mm-checklist-text" t-esc="update_item"/>
+                                                                        </div>
+                                                                    </t>
+                                                                    <t t-else="">
+                                                                        <span t-esc="row['progress_note']"/>
+                                                                    </t>
+                                                                </div>
+                                                                <div class="np-mm-progress" t-if="row['note_items']" t-att-style="'padding-left:%spx;' % (14 if row['marker'] == '\u2022' else 2)">
+                                                                    <strong>Note:</strong>
+                                                                    <br/>
+                                                                    <div class="np-mm-checklist-row" t-foreach="row['note_items']" t-as="note_item">
+                                                                        <span class="np-mm-checklist-marker">✓</span>
+                                                                        <span class="np-mm-checklist-text" t-esc="note_item"/>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="np-mm-change" t-if="row['change_summary']">
+                                                                    <strong>Perubahan:</strong>
+                                                                    <br/>
+                                                                    <span t-esc="row['change_summary']"/>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                                <td><span t-esc="row['owner'] or ''"/></td>
+                                                <td><span t-if="row['is_leaf']" t-esc="row['target']"/></td>
+                                                <td><span t-if="row['is_leaf']" t-esc="row['status']"/></td>
+                                            </tr>
+                                        </t>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <template id="report_np_meeting_minutes_web_document">
+        <t t-call="web.html_container">
+            <t t-set="o" t-value="meeting"/>
+            <style>
+                .np-mm-web-wrap { --np-mm-web-scale: 1; background: #f3f3f1; padding: 24px; }
+                .np-mm-web-toolbar { max-width: 980px; margin: 0 auto 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-family: Arial, sans-serif; }
+                .np-mm-web-toolbar__group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+                .np-mm-web-btn { border: 1px solid #222; background: #ffffff; color: #111111; padding: 8px 12px; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; }
+                .np-mm-web-btn:hover { background: #f0f0f0; }
+                .np-mm-web-zoom { font-size: 13px; font-weight: 700; color: #222; min-width: 62px; text-align: center; }
+                .np-mm-web-stage { max-width: 100%; margin: 0 auto; overflow: auto; padding: 8px 0 24px; }
+                .np-mm-web-stage--fullscreen { position: fixed; inset: 0; z-index: 9999; background: #1b1b1b; padding: 16px; max-width: none; }
+                .np-mm-web-stage__inner { width: max-content; min-width: 100%; margin: 0 auto; display: flex; justify-content: center; }
+                .np-mm-web-sheet { width: 980px; margin: 0 auto; background: #ffffff; color: #111111; font-family: Arial, sans-serif; box-shadow: 0 8px 30px rgba(0,0,0,0.08); padding: 28px 30px 36px; transform: scale(var(--np-mm-web-scale)); transform-origin: top center; transition: transform 0.15s ease; }
+                .np-mm-web-title { text-align: center; font-size: 22px; font-weight: 700; margin: 0 0 16px; }
+                .np-mm-web-meta { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+                .np-mm-web-meta td { border: 1px solid #222; padding: 4px 6px; font-size: 13px; vertical-align: top; }
+                .np-mm-web-meta__label { width: 18%; font-weight: 700; }
+                .np-mm-web-participants { margin: 0 0 14px; font-size: 13px; }
+                .np-mm-web-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+                .np-mm-web-table th, .np-mm-web-table td { border: 1px solid #222; padding: 5px 6px; vertical-align: top; font-size: 13px; }
+                .np-mm-web-table th { background: #d9d9d9; text-align: center; font-weight: 700; }
+                .np-mm-web-section td { font-weight: 700; text-transform: uppercase; }
+                .np-mm-web-section__desc { display: block; margin-top: 3px; font-weight: 400; text-transform: none; white-space: pre-line; }
+                .np-mm-web-no { width: 6%; text-align: center; }
+                .np-mm-web-owner { width: 12%; }
+                .np-mm-web-target { width: 12%; text-align: center; }
+                .np-mm-web-status { width: 12%; text-align: center; }
+                .np-mm-web-parent { font-weight: 700; text-transform: uppercase; }
+                .np-mm-web-child td { border-top: 0 !important; border-bottom: 0 !important; }
+                .np-mm-web-child--last td { border-bottom: 1px solid #222 !important; }
+                .np-mm-web-outline { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 0; }
+                .np-mm-web-outline td { border: 0 !important; padding: 1px 0 0 0; vertical-align: top; }
+                .np-mm-web-outline__marker { width: 22px; font-weight: 700; }
+                .np-mm-web-outline__topic { font-weight: 700; }
+                .np-mm-web-outline__text { white-space: pre-line; margin-top: 2px; }
+                .np-mm-web-gap { display: block; min-height: 18px; }
+                .np-mm-web-update { margin-top: -2px; margin-bottom: 0; white-space: pre-line; }
+                .np-mm-web-checklist-row { display: table; width: 100%; table-layout: fixed; margin-top: 2px; }
+                .np-mm-web-checklist-marker { display: table-cell; width: 14px; vertical-align: top; font-weight: 700; }
+                .np-mm-web-checklist-text { display: table-cell; vertical-align: top; white-space: pre-line; }
+                .np-mm-web-inner-table { width: 100%; border-collapse: collapse; margin: 6px 0 4px; table-layout: fixed; }
+                .np-mm-web-inner-table th, .np-mm-web-inner-table td { border: 1px solid #222 !important; padding: 3px 5px !important; font-size: 12px; text-transform: none; }
+                .np-mm-web-inner-table th { font-weight: 700; text-align: center; }
+                .np-mm-web-inner-table-title { font-weight: 700; margin: 5px 0 2px; text-transform: none; }
+                .np-mm-web-wrap--fullscreen { min-height: 100vh; background: #1b1b1b; padding: 16px; }
+                .np-mm-web-wrap--fullscreen .np-mm-web-toolbar { max-width: none; margin-bottom: 12px; }
+                .np-mm-web-wrap--fullscreen .np-mm-web-zoom { color: #f5f5f5; }
+                @media print {
+                    body { margin: 0; background: #fff; }
+                    .np-mm-web-toolbar { display: none !important; }
+                    .np-mm-web-wrap { background: #fff; padding: 0; }
+                    .np-mm-web-stage { max-width: none; overflow: visible; }
+                    .np-mm-web-sheet { box-shadow: none; margin: 0; width: auto; padding: 0; transform: none !important; }
+                }
+            </style>
+            <div class="np-mm-web-wrap">
+                <div class="np-mm-web-toolbar">
+                    <div class="np-mm-web-toolbar__group">
+                        <button class="np-mm-web-btn" type="button" onclick="window.print()">Print</button>
+                        <button class="np-mm-web-btn" type="button" onclick="npMeetingMinutesZoom(-0.1)">Zoom -</button>
+                        <button class="np-mm-web-btn" type="button" onclick="npMeetingMinutesZoom(0.1)">Zoom +</button>
+                        <button class="np-mm-web-btn" type="button" onclick="npMeetingMinutesZoomReset()">Reset</button>
+                        <button class="np-mm-web-btn" type="button" id="np-mm-web-fullscreen-btn" onclick="npMeetingMinutesToggleFullscreen()">Fullscreen</button>
+                        <span class="np-mm-web-zoom" id="np-mm-web-zoom-label">100%</span>
+                    </div>
+                    <div class="np-mm-web-toolbar__group">
+                        <a class="np-mm-web-btn" t-att-href="'/report/pdf/np_meeting_minutes.report_np_meeting_minutes_document/%s' % o.id">Download PDF</a>
+                    </div>
+                </div>
+                <div class="np-mm-web-stage" id="np-mm-web-stage">
+                <div class="np-mm-web-stage__inner">
+                <div class="np-mm-web-sheet" id="np-mm-web-sheet">
+                    <h1 class="np-mm-web-title">NOTULEN RAPAT</h1>
+                    <table class="np-mm-web-meta">
+                        <tr>
+                            <td class="np-mm-web-meta__label">Agenda</td>
+                            <td><span t-esc="o.agenda or o.title or '-'"/></td>
+                            <td class="np-mm-web-meta__label">Tempat</td>
+                            <td><span t-esc="o.location or '-'"/></td>
+                        </tr>
+                        <tr>
+                            <td class="np-mm-web-meta__label">Hari / Tanggal</td>
+                            <td><span t-esc="o.get_meeting_date_display()"/></td>
+                            <td class="np-mm-web-meta__label">Pukul</td>
+                            <td><span t-esc="o.get_meeting_time_display()"/></td>
+                        </tr>
+                        <tr>
+                            <td class="np-mm-web-meta__label">Notulis</td>
+                            <td><span t-esc="o.note_taker_id.name or '-'"/></td>
+                            <td class="np-mm-web-meta__label">No. Notulen</td>
+                            <td><span t-esc="o.name or '-'"/></td>
+                        </tr>
+                    </table>
+                    <div class="np-mm-web-participants">
+                        <strong>Peserta Rapat :</strong>
+                        <span t-esc="o.participant_names or '-'"/>
+                    </div>
+                    <table class="np-mm-web-table">
+                        <thead>
+                            <tr>
+                                <th class="np-mm-web-no">No</th>
+                                <th>Pembahasan</th>
+                                <th class="np-mm-web-owner">Oleh</th>
+                                <th class="np-mm-web-target">Target</th>
+                                <th class="np-mm-web-status">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="o.line_ids.sorted(key=lambda line: (line.sequence, line.id))" t-as="line">
+                                <tr t-if="line.line_type == 'section'" class="np-mm-web-section">
+                                    <td colspan="5">
+                                        <span t-esc="line.section_title or '-'"/>
+                                        <span class="np-mm-web-section__desc" t-if="line.discussion" t-esc="line.discussion"/>
+                                    </td>
+                                </tr>
+                                <tr t-if="line.line_type == 'item' and not line.parent_line_id">
+                                    <t t-set="outline_rows" t-value="line.get_report_outline_rows()"/>
+                                    <td class="np-mm-web-no"><span t-esc="line.number or ''"/></td>
+                                    <td>
+                                        <div class="np-mm-web-parent"><span t-esc="line.topic or ''"/></div>
+                                        <div class="np-mm-web-outline__text" t-if="line.discussion"><span t-esc="line.discussion"/></div>
+                                        <t t-if="line.has_table_content()">
+                                            <div class="np-mm-web-inner-table-title" t-if="line.table_title"><span t-esc="line.table_title"/></div>
+                                            <table class="np-mm-web-inner-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th t-foreach="line.get_active_table_columns()" t-as="column"><span t-esc="column['label'] or ''"/></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr t-foreach="line.get_table_rows()" t-as="table_row">
+                                                        <td t-foreach="table_row['values']" t-as="cell"><span t-esc="cell"/></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </t>
+                                        <div class="np-mm-web-update" t-if="line.get_update_items() or line.progress_note" style="padding-left:2px;">
+                                            <strong>Update:</strong><br/>
+                                            <t t-if="line.get_update_items()">
+                                                <div class="np-mm-web-checklist-row" t-foreach="line.get_update_items()" t-as="update_item">
+                                                    <span class="np-mm-web-checklist-marker">✓</span>
+                                                    <span class="np-mm-web-checklist-text" t-esc="update_item"/>
+                                                </div>
+                                            </t>
+                                            <t t-else="">
+                                                <span t-esc="line.progress_note"/>
+                                            </t>
+                                        </div>
+                                        <div class="np-mm-web-update" t-if="line.get_note_items()" style="padding-left:2px;">
+                                            <strong>Note:</strong><br/>
+                                            <div class="np-mm-web-checklist-row" t-foreach="line.get_note_items()" t-as="note_item">
+                                                <span class="np-mm-web-checklist-marker">✓</span>
+                                                <span class="np-mm-web-checklist-text" t-esc="note_item"/>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td><span t-esc="line.owner_names or ''"/></td>
+                                    <td><span t-esc="line._get_target_label() or ''"/></td>
+                                    <td><span t-esc="line._get_progress_status_label() or ''"/></td>
+                                </tr>
+                                <tr
+                                    t-if="line.line_type == 'item' and not line.parent_line_id and outline_rows"
+                                    t-foreach="outline_rows"
+                                    t-as="row"
+                                    t-att-class="'np-mm-web-child%s' % (' np-mm-web-child--last' if row_last else '')"
+                                >
+                                    <td class="np-mm-web-no"></td>
+                                    <td>
+                                        <table class="np-mm-web-outline">
+                                            <tr>
+                                                <td
+                                                    class="np-mm-web-outline__marker"
+                                                    t-att-style="'width:%spx; padding-left:%spx; padding-right:%spx;' % (((12 if row['marker'] == '\\u2022' else 22)), ((18 + ((row['level'] - 2) * 10)) if row['marker'] == '\\u2022' else ((row['level'] - 1) * 14)), (4 if row['marker'] == '\\u2022' else 6))"
+                                                >
+                                                    <span t-esc="row['marker']"/>
+                                                </td>
+                                                <td>
+                                                    <div class="np-mm-web-outline__topic"><span t-esc="row['topic']"/></div>
+                                                    <div class="np-mm-web-outline__text" t-if="row['discussion']"><span t-esc="row['discussion']"/></div>
+                                                    <t t-if="row['has_table']">
+                                                        <div class="np-mm-web-inner-table-title" t-if="row['table_title']"><span t-esc="row['table_title']"/></div>
+                                                        <table class="np-mm-web-inner-table">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th t-foreach="row['table_columns']" t-as="column"><span t-esc="column['label'] or ''"/></th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <tr t-foreach="row['table_rows']" t-as="table_row">
+                                                                    <td t-foreach="table_row['values']" t-as="cell"><span t-esc="cell"/></td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </t>
+                                                    <div class="np-mm-web-update" t-if="row['update_items'] or row['progress_note']" style="padding-left:2px;">
+                                                        <strong>Update:</strong><br/>
+                                                        <t t-if="row['update_items']">
+                                                            <div class="np-mm-web-checklist-row" t-foreach="row['update_items']" t-as="update_item">
+                                                                <span class="np-mm-web-checklist-marker">✓</span>
+                                                                <span class="np-mm-web-checklist-text" t-esc="update_item"/>
+                                                            </div>
+                                                        </t>
+                                                        <t t-else="">
+                                                            <span t-esc="row['progress_note']"/>
+                                                        </t>
+                                                    </div>
+                                                    <div class="np-mm-web-update" t-if="row['note_items']" style="padding-left:2px;">
+                                                        <strong>Note:</strong><br/>
+                                                        <div class="np-mm-web-checklist-row" t-foreach="row['note_items']" t-as="note_item">
+                                                            <span class="np-mm-web-checklist-marker">✓</span>
+                                                            <span class="np-mm-web-checklist-text" t-esc="note_item"/>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td><span t-esc="row['owner'] or ''"/></td>
+                                    <td><span t-if="row['is_leaf']" t-esc="row['target']"/></td>
+                                    <td><span t-if="row['is_leaf']" t-esc="row['status']"/></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+                </div>
+                </div>
+            </div>
+            <script type="text/javascript">
+                (function () {
+                    var root = document.querySelector('.np-mm-web-wrap');
+                    var stage = document.getElementById('np-mm-web-stage');
+                    var label = document.getElementById('np-mm-web-zoom-label');
+                    var fullscreenBtn = document.getElementById('np-mm-web-fullscreen-btn');
+                    var currentScale = 1;
+
+                    function applyScale() {
+                        if (!root) {
+                            return;
+                        }
+                        root.style.setProperty('--np-mm-web-scale', currentScale.toFixed(2));
+                        if (label) {
+                            label.textContent = Math.round(currentScale * 100) + '%';
+                        }
+                    }
+
+                    window.npMeetingMinutesZoom = function (delta) {
+                        currentScale = Math.max(0.6, Math.min(1.8, currentScale + delta));
+                        applyScale();
+                    };
+
+                    window.npMeetingMinutesZoomReset = function () {
+                        currentScale = 1;
+                        applyScale();
+                    };
+
+                    window.npMeetingMinutesToggleFullscreen = function () {
+                        if (!stage || !root) {
+                            return;
+                        }
+                        var isFullscreen = stage.classList.toggle('np-mm-web-stage--fullscreen');
+                        root.classList.toggle('np-mm-web-wrap--fullscreen', isFullscreen);
+                        if (fullscreenBtn) {
+                            fullscreenBtn.textContent = isFullscreen ? 'Exit Fullscreen' : 'Fullscreen';
+                        }
+                    };
+
+                    applyScale();
+                })();
+            </script>
+        </t>
+    </template>
+</odoo>

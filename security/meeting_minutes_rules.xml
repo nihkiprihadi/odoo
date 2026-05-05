@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="rule_np_meeting_minutes_user_scope" model="ir.rule">
+        <field name="name">Meeting Minutes - User Scope</field>
+        <field name="model_id" ref="model_np_meeting_minutes"/>
+        <field name="domain_force">
+            ['|', '|', '|', '|', ('requested_by', '=', user.id), ('note_taker_id.user_id', '=', user.id), ('participant_ids.user_id', '=', user.id), ('approver_id', '=', user.id), ('department_id.manager_id.user_id', '=', user.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_np_meeting_minutes_admin_all" model="ir.rule">
+        <field name="name">Meeting Minutes - Admin All</field>
+        <field name="model_id" ref="model_np_meeting_minutes"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('np_meeting_minutes.group_meeting_minutes_admin')), (4, ref('base.group_system'))]"/>
+    </record>
+
+    <record id="rule_np_meeting_minutes_line_user_scope" model="ir.rule">
+        <field name="name">Meeting Minutes Line - User Scope</field>
+        <field name="model_id" ref="model_np_meeting_minutes_line"/>
+        <field name="domain_force">
+            ['|', '|', '|', '|', ('meeting_id.requested_by', '=', user.id), ('meeting_id.note_taker_id.user_id', '=', user.id), ('meeting_id.participant_ids.user_id', '=', user.id), ('meeting_id.approver_id', '=', user.id), ('meeting_id.department_id.manager_id.user_id', '=', user.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_np_meeting_minutes_line_admin_all" model="ir.rule">
+        <field name="name">Meeting Minutes Line - Admin All</field>
+        <field name="model_id" ref="model_np_meeting_minutes_line"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('np_meeting_minutes.group_meeting_minutes_admin')), (4, ref('base.group_system'))]"/>
+    </record>
+
+    <record id="rule_np_meeting_minutes_change_user_scope" model="ir.rule">
+        <field name="name">Meeting Minutes Change - User Scope</field>
+        <field name="model_id" ref="model_np_meeting_minutes_line_change"/>
+        <field name="domain_force">
+            ['|', '|', '|', '|', ('meeting_id.requested_by', '=', user.id), ('meeting_id.note_taker_id.user_id', '=', user.id), ('meeting_id.participant_ids.user_id', '=', user.id), ('meeting_id.approver_id', '=', user.id), ('meeting_id.department_id.manager_id.user_id', '=', user.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_np_meeting_minutes_change_admin_all" model="ir.rule">
+        <field name="name">Meeting Minutes Change - Admin All</field>
+        <field name="model_id" ref="model_np_meeting_minutes_line_change"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('np_meeting_minutes.group_meeting_minutes_admin')), (4, ref('base.group_system'))]"/>
+    </record>
+
+    <record id="rule_np_meeting_minutes_checklist_user_scope" model="ir.rule">
+        <field name="name">Meeting Minutes Checklist - User Scope</field>
+        <field name="model_id" ref="model_np_meeting_minutes_line_checklist"/>
+        <field name="domain_force">
+            ['|', '|', '|', '|', ('meeting_id.requested_by', '=', user.id), ('meeting_id.note_taker_id.user_id', '=', user.id), ('meeting_id.participant_ids.user_id', '=', user.id), ('meeting_id.approver_id', '=', user.id), ('meeting_id.department_id.manager_id.user_id', '=', user.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_np_meeting_minutes_checklist_admin_all" model="ir.rule">
+        <field name="name">Meeting Minutes Checklist - Admin All</field>
+        <field name="model_id" ref="model_np_meeting_minutes_line_checklist"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('np_meeting_minutes.group_meeting_minutes_admin')), (4, ref('base.group_system'))]"/>
+    </record>
+
+    <record id="rule_np_meeting_minutes_table_row_user_scope" model="ir.rule">
+        <field name="name">Meeting Minutes Table Row - User Scope</field>
+        <field name="model_id" ref="model_np_meeting_minutes_line_table_row"/>
+        <field name="domain_force">
+            ['|', '|', '|', '|', ('meeting_id.requested_by', '=', user.id), ('meeting_id.note_taker_id.user_id', '=', user.id), ('meeting_id.participant_ids.user_id', '=', user.id), ('meeting_id.approver_id', '=', user.id), ('meeting_id.department_id.manager_id.user_id', '=', user.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_np_meeting_minutes_table_row_admin_all" model="ir.rule">
+        <field name="name">Meeting Minutes Table Row - Admin All</field>
+        <field name="model_id" ref="model_np_meeting_minutes_line_table_row"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('np_meeting_minutes.group_meeting_minutes_admin')), (4, ref('base.group_system'))]"/>
+    </record>
+</odoo>

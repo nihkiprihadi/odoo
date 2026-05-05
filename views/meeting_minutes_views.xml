@@ -1,0 +1,497 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_np_meeting_minutes_list" model="ir.ui.view">
+        <field name="name">np.meeting.minutes.list</field>
+        <field name="model">np.meeting.minutes</field>
+        <field name="arch" type="xml">
+            <list
+                string="Notulen Meeting"
+                default_order="meeting_date desc, start_time desc, id desc"
+                decoration-warning="state == 'waiting_approval'"
+                decoration-success="state in ('approved', 'done')"
+                decoration-danger="state == 'rejected'"
+            >
+                <field name="name"/>
+                <field name="title"/>
+                <field name="department_id"/>
+                <field name="agenda"/>
+                <field name="meeting_date"/>
+                <field name="location"/>
+                <field name="note_taker_id"/>
+                <field name="approver_id"/>
+                <field name="state"/>
+                <field name="line_count"/>
+                <field name="change_count"/>
+                <field name="carry_forward_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_np_meeting_minutes_search" model="ir.ui.view">
+        <field name="name">np.meeting.minutes.search</field>
+        <field name="model">np.meeting.minutes</field>
+        <field name="arch" type="xml">
+            <search string="Search Notulen Meeting">
+                <field name="name"/>
+                <field name="title"/>
+                <field name="agenda"/>
+                <field name="meeting_date"/>
+                <field name="department_id"/>
+                <field name="note_taker_id"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Menunggu Approval" name="waiting_approval" domain="[('state', '=', 'waiting_approval')]"/>
+                <filter string="Disetujui" name="approved" domain="[('state', '=', 'approved')]"/>
+                <filter string="Ditolak" name="rejected" domain="[('state', '=', 'rejected')]"/>
+                <filter string="Selesai" name="done" domain="[('state', '=', 'done')]"/>
+                <separator/>
+                <filter string="Group by Tanggal" name="group_date" context="{'group_by': 'meeting_date'}"/>
+                <filter string="Group by Divisi" name="group_department" context="{'group_by': 'department_id'}"/>
+                <filter string="Group by Notulis" name="group_note_taker" context="{'group_by': 'note_taker_id'}"/>
+                <filter string="Group by Status" name="group_state" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_np_meeting_minutes_form" model="ir.ui.view">
+        <field name="name">np.meeting.minutes.form</field>
+        <field name="model">np.meeting.minutes</field>
+        <field name="arch" type="xml">
+            <form string="Notulen Meeting">
+                <header>
+                    <button name="action_submit_approval" type="object" string="Submit Approval" class="btn-primary" invisible="not can_submit_approval"/>
+                    <button name="action_approve" type="object" string="Approve" class="btn-primary" invisible="not can_approve"/>
+                    <button name="action_reject" type="object" string="Reject" class="btn-secondary" invisible="not can_approve"/>
+                    <button name="action_done" type="object" string="Selesaikan" class="btn-primary" invisible="state in ('draft', 'waiting_approval', 'rejected', 'done')"/>
+                    <button name="action_reset_to_draft" type="object" string="Set Draft" invisible="not can_reset or state == 'draft'"/>
+                    <button name="action_create_follow_up_meeting" type="object" string="Buat Meeting Lanjutan" class="btn-secondary" invisible="state not in ('approved', 'done')"/>
+                    <button name="action_carry_forward_items" type="object" string="Bawa Open Items" class="btn-secondary" invisible="not can_carry_forward"/>
+                    <button name="action_rebuild_follow_up_structure" type="object" string="Perbaiki Struktur Follow Up" class="btn-secondary" invisible="not can_edit_meeting or not carry_forward_source_id or state not in ('draft', 'rejected')"/>
+                    <button name="action_export_excel" type="object" string="Export Excel" class="btn-secondary"/>
+                    <button name="action_export_word" type="object" string="Export Word" class="btn-secondary"/>
+                    <button name="action_print_web" type="object" string="Print Web" class="btn-secondary"/>
+                    <button name="action_view_changes" type="object" string="Riwayat Perubahan" class="btn-secondary"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,waiting_approval,approved,rejected,done"/>
+                </header>
+                <sheet>
+                    <group invisible="1">
+                        <field name="is_admin"/>
+                        <field name="can_edit_meeting"/>
+                        <field name="can_submit_approval"/>
+                        <field name="can_approve"/>
+                        <field name="can_reset"/>
+                        <field name="can_carry_forward"/>
+                    </group>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="title" placeholder="Judul rapat..." readonly="not can_edit_meeting"/>
+                        </h1>
+                        <div>
+                            No. Notulen: <field name="name" readonly="1" nolabel="1"/>
+                        </div>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="agenda" readonly="not can_edit_meeting"/>
+                            <field name="meeting_date" readonly="not can_edit_meeting"/>
+                            <field name="day_name" readonly="1"/>
+                            <field name="location" readonly="not can_edit_meeting"/>
+                            <field name="department_id" readonly="not can_edit_meeting" options="{'no_create': True, 'no_open': False}"/>
+                        </group>
+                        <group>
+                            <field name="start_time" widget="float_time" readonly="not can_edit_meeting"/>
+                            <field name="end_time" widget="float_time" readonly="not can_edit_meeting"/>
+                            <field name="note_taker_id" readonly="not can_edit_meeting" options="{'no_create': True}"/>
+                            <field name="participant_ids" widget="many2many_tags" readonly="not can_edit_meeting" options="{'no_create': True}"/>
+                            <field name="approver_id" readonly="not can_edit_meeting" options="{'no_create': True}"/>
+                            <field name="carry_forward_source_id" readonly="not can_edit_meeting" options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="requested_by" readonly="1"/>
+                            <field name="approved_by" readonly="1" invisible="state not in ('approved', 'done')"/>
+                            <field name="approved_date" readonly="1" invisible="state not in ('approved', 'done')"/>
+                        </group>
+                        <group>
+                            <field name="rejected_by" readonly="1" invisible="state != 'rejected'"/>
+                            <field name="rejected_date" readonly="1" invisible="state != 'rejected'"/>
+                            <field name="approval_note" placeholder="Catatan approval..." readonly="not (can_edit_meeting or can_approve)"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Pembahasan">
+                            <group>
+                                <button name="action_view_lines" type="object" string="Cari / Tampilkan Semua Pembahasan" class="btn-secondary"/>
+                            </group>
+                            <field name="line_ids" context="{'default_meeting_id': id}" readonly="not can_edit_meeting">
+                                <list delete="true">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="line_type"/>
+                                    <field name="section_title" optional="show"/>
+                                    <field name="number"/>
+                                    <field name="topic"/>
+                                    <button name="action_add_subitem" type="object" string="Tambah Sub Item" icon="fa-level-down" invisible="line_type != 'item'"/>
+                                    <field name="parent_line_id" optional="show"/>
+                                    <field name="discussion"/>
+                                    <field name="owner_ids" widget="many2many_tags" optional="show"/>
+                                    <field name="target_type"/>
+                                    <field name="progress_status"/>
+                                    <field name="progress_note"/>
+                                    <field name="carried_forward" optional="show"/>
+                                    <field name="previous_line_id" optional="show"/>
+                                </list>
+                                <form string="Baris Notulen">
+                                    <header>
+                                        <button name="action_add_subitem" type="object" string="Tambah Sub Item" class="btn-secondary" invisible="line_type != 'item'"/>
+                                        <button name="action_delete_line" type="object" string="Hapus" class="btn-danger"/>
+                                    </header>
+                                    <group>
+                                        <group>
+                                            <field name="line_type"/>
+                                            <field name="sequence"/>
+                                            <field name="section_title" invisible="line_type != 'section'"/>
+                                            <field name="number" invisible="line_type != 'item'"/>
+                                            <field name="topic" invisible="line_type != 'item'"/>
+                                            <field name="use_table" invisible="line_type != 'item'"/>
+                                            <field name="parent_line_id" invisible="line_type != 'item'" options="{'no_create': True}" placeholder="Kosongkan untuk topik utama"/>
+                                            <field name="owner_ids" widget="many2many_tags" invisible="line_type != 'item'" options="{'no_create': True}"/>
+                                        </group>
+                                        <group>
+                                            <field name="target_type" invisible="line_type != 'item'"/>
+                                            <field name="progress_status" invisible="line_type != 'item'"/>
+                                            <field name="carried_forward" readonly="1" invisible="line_type != 'item'"/>
+                                            <field name="previous_line_id" invisible="line_type != 'item'"/>
+                                            <field name="previous_status" readonly="1" invisible="line_type != 'item'"/>
+                                        </group>
+                                    </group>
+                                    <group invisible="line_type != 'item'">
+                                        <field name="discussion" placeholder="Isi pembahasan..."/>
+                                        <group string="Tabel" invisible="not use_table">
+                                            <field name="table_title" placeholder="Judul tabel..."/>
+                                            <group col="2">
+                                                <field name="table_col_1_label" placeholder="Header kolom 1"/>
+                                                <field name="table_col_2_label" placeholder="Header kolom 2"/>
+                                                <field name="table_col_3_label" placeholder="Header kolom 3"/>
+                                                <field name="table_col_4_label" placeholder="Header kolom 4"/>
+                                                <field name="table_col_5_label" placeholder="Header kolom 5"/>
+                                                <field name="table_col_6_label" placeholder="Header kolom 6"/>
+                                            </group>
+                                            <field name="table_header_guide" widget="text" readonly="1" invisible="not table_header_guide"/>
+                                            <field name="table_row_ids">
+                                                <list editable="bottom">
+                                                    <field name="sequence" widget="handle"/>
+                                                    <field name="col_1" string="Isi 1"/>
+                                                    <field name="col_2" string="Isi 2"/>
+                                                    <field name="col_3" string="Isi 3"/>
+                                                    <field name="col_4" string="Isi 4"/>
+                                                    <field name="col_5" string="Isi 5"/>
+                                                    <field name="col_6" string="Isi 6"/>
+                                                </list>
+                                                <form string="Baris Tabel">
+                                                    <group>
+                                                        <field name="sequence"/>
+                                                    </group>
+                                                    <group col="2">
+                                                        <field name="header_1_label" string="Header 1" readonly="1"/>
+                                                        <field name="col_1" string="Isi Header 1"/>
+                                                        <field name="header_2_label" string="Header 2" readonly="1"/>
+                                                        <field name="col_2" string="Isi Header 2"/>
+                                                        <field name="header_3_label" string="Header 3" readonly="1"/>
+                                                        <field name="col_3" string="Isi Header 3"/>
+                                                        <field name="header_4_label" string="Header 4" readonly="1"/>
+                                                        <field name="col_4" string="Isi Header 4"/>
+                                                        <field name="header_5_label" string="Header 5" readonly="1"/>
+                                                        <field name="col_5" string="Isi Header 5"/>
+                                                        <field name="header_6_label" string="Header 6" readonly="1"/>
+                                                        <field name="col_6" string="Isi Header 6"/>
+                                                    </group>
+                                                </form>
+                                            </field>
+                                        </group>
+                                        <field name="progress_note" placeholder="Update teks bebas lama (opsional)..."/>
+                                        <group string="Checklist Update">
+                                            <field name="update_checklist_ids" context="{'default_check_type': 'update'}">
+                                                <list editable="bottom">
+                                                    <field name="sequence" widget="handle"/>
+                                                    <field name="check_type" column_invisible="1"/>
+                                                    <field name="content" string="Item Update"/>
+                                                </list>
+                                                <form string="Item Update">
+                                                    <group>
+                                                        <field name="sequence"/>
+                                                        <field name="check_type" readonly="1"/>
+                                                        <field name="content" placeholder="Contoh: Sudah dicoba install windows server 2025 versi evaluation..."/>
+                                                    </group>
+                                                </form>
+                                            </field>
+                                        </group>
+                                        <group string="Checklist Note">
+                                            <field name="note_checklist_ids" context="{'default_check_type': 'note'}">
+                                                <list editable="bottom">
+                                                    <field name="sequence" widget="handle"/>
+                                                    <field name="check_type" column_invisible="1"/>
+                                                    <field name="content" string="Item Note"/>
+                                                </list>
+                                                <form string="Item Note">
+                                                    <group>
+                                                        <field name="sequence"/>
+                                                        <field name="check_type" readonly="1"/>
+                                                        <field name="content" placeholder="Contoh: Menunggu approval dari user untuk restart..."/>
+                                                    </group>
+                                                </form>
+                                            </field>
+                                        </group>
+                                        <field name="change_summary" readonly="1"/>
+                                    </group>
+                                    <group invisible="line_type != 'section'">
+                                        <field name="section_title" placeholder="Contoh: JARINGAN DAN INFRASTRUKTUR"/>
+                                        <field name="discussion" string="Description" placeholder="Deskripsi section (opsional)..."/>
+                                    </group>
+                                    <field name="change_log_ids" readonly="1" invisible="line_type != 'item'">
+                                        <list string="Riwayat Perubahan">
+                                            <field name="create_date"/>
+                                            <field name="change_type"/>
+                                            <field name="user_id"/>
+                                            <field name="old_status"/>
+                                            <field name="new_status"/>
+                                            <field name="old_target_type"/>
+                                            <field name="new_target_type"/>
+                                            <field name="message"/>
+                                        </list>
+                                    </field>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Ringkasan">
+                            <group>
+                                <field name="participant_names" readonly="1" widget="text"/>
+                                <field name="line_count" readonly="1"/>
+                                <field name="change_count" readonly="1"/>
+                                <field name="carry_forward_count" readonly="1"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_np_meeting_minutes_line_change_list" model="ir.ui.view">
+        <field name="name">np.meeting.minutes.line.change.list</field>
+        <field name="model">np.meeting.minutes.line.change</field>
+        <field name="arch" type="xml">
+            <list string="Riwayat Perubahan" default_order="create_date desc">
+                <field name="create_date"/>
+                <field name="meeting_id"/>
+                <field name="line_id"/>
+                <field name="change_type"/>
+                <field name="user_id"/>
+                <field name="old_status"/>
+                <field name="new_status"/>
+                <field name="old_target_type"/>
+                <field name="new_target_type"/>
+                <field name="message"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_np_meeting_minutes_line_list" model="ir.ui.view">
+        <field name="name">np.meeting.minutes.line.list</field>
+        <field name="model">np.meeting.minutes.line</field>
+        <field name="arch" type="xml">
+            <list string="Pembahasan Meeting" default_order="sequence asc, id asc">
+                <field name="meeting_id" optional="show"/>
+                <field name="line_type"/>
+                <field name="number"/>
+                <field name="topic"/>
+                <field name="section_title" optional="show"/>
+                <field name="parent_line_id" optional="show"/>
+                <field name="discussion"/>
+                                    <field name="owner_ids" widget="many2many_tags" optional="show"/>
+                                    <field name="target_type"/>
+                                    <field name="progress_status"/>
+                                    <field name="progress_note"/>
+                                </list>
+        </field>
+    </record>
+
+    <record id="view_np_meeting_minutes_line_search" model="ir.ui.view">
+        <field name="name">np.meeting.minutes.line.search</field>
+        <field name="model">np.meeting.minutes.line</field>
+        <field name="arch" type="xml">
+            <search string="Cari Pembahasan">
+                <field name="number" string="No"/>
+                <field name="topic"/>
+                <field name="discussion"/>
+                <field name="meeting_id"/>
+                <field name="parent_line_id"/>
+                <filter string="Section" name="section" domain="[('line_type', '=', 'section')]"/>
+                <filter string="Item" name="item" domain="[('line_type', '=', 'item')]"/>
+                <filter string="Topik Utama" name="root" domain="[('line_type', '=', 'item'), ('parent_line_id', '=', False)]"/>
+                <filter string="Sub Item" name="subitem" domain="[('parent_line_id', '!=', False)]"/>
+                <separator/>
+                <filter string="Group by Tipe" name="group_type" context="{'group_by': 'line_type'}"/>
+                <filter string="Group by Parent" name="group_parent" context="{'group_by': 'parent_line_id'}"/>
+                <filter string="Group by Meeting" name="group_meeting" context="{'group_by': 'meeting_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_np_meeting_minutes_line_form" model="ir.ui.view">
+        <field name="name">np.meeting.minutes.line.form</field>
+        <field name="model">np.meeting.minutes.line</field>
+        <field name="arch" type="xml">
+            <form string="Pembahasan Meeting">
+                <header>
+                    <button name="action_add_subitem" type="object" string="Tambah Sub Item" class="btn-secondary" invisible="line_type != 'item'"/>
+                    <button name="action_delete_line" type="object" string="Hapus" class="btn-danger"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="meeting_id" readonly="1"/>
+                            <field name="line_type"/>
+                            <field name="sequence"/>
+                            <field name="number" invisible="line_type != 'item'"/>
+                            <field name="section_title" invisible="line_type != 'section'"/>
+                            <field name="topic" invisible="line_type != 'item'"/>
+                            <field name="parent_line_id" invisible="line_type != 'item'" options="{'no_create': True}"/>
+                            <field name="owner_ids" widget="many2many_tags" invisible="line_type != 'item'" options="{'no_create': True}"/>
+                        </group>
+                        <group>
+                            <field name="target_type" invisible="line_type != 'item'"/>
+                            <field name="progress_status" invisible="line_type != 'item'"/>
+                            <field name="previous_line_id" invisible="line_type != 'item'"/>
+                            <field name="carried_forward" readonly="1" invisible="line_type != 'item'"/>
+                        </group>
+                    </group>
+                    <group invisible="line_type != 'item'">
+                        <field name="discussion"/>
+                        <field name="progress_note" placeholder="Update teks bebas lama (opsional)..."/>
+                        <group string="Checklist Update">
+                            <field name="update_checklist_ids" context="{'default_check_type': 'update'}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="check_type" column_invisible="1"/>
+                                    <field name="content" string="Item Update"/>
+                                </list>
+                            </field>
+                        </group>
+                        <group string="Checklist Note">
+                            <field name="note_checklist_ids" context="{'default_check_type': 'note'}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="check_type" column_invisible="1"/>
+                                    <field name="content" string="Item Note"/>
+                                </list>
+                            </field>
+                        </group>
+                    </group>
+                    <group invisible="line_type != 'section'">
+                        <field name="discussion" string="Description"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_np_meeting_minutes_line_change_form" model="ir.ui.view">
+        <field name="name">np.meeting.minutes.line.change.form</field>
+        <field name="model">np.meeting.minutes.line.change</field>
+        <field name="arch" type="xml">
+            <form string="Riwayat Perubahan">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="meeting_id" readonly="1"/>
+                            <field name="line_id" readonly="1"/>
+                            <field name="change_type" readonly="1"/>
+                            <field name="user_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="old_status" readonly="1"/>
+                            <field name="new_status" readonly="1"/>
+                            <field name="old_target_type" readonly="1"/>
+                            <field name="new_target_type" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="message" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_np_meeting_minutes_line_subitem_popup" model="ir.ui.view">
+        <field name="name">np.meeting.minutes.line.subitem.popup</field>
+        <field name="model">np.meeting.minutes.line</field>
+        <field name="arch" type="xml">
+            <form string="Tambah Sub Item">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="meeting_id" readonly="1"/>
+                            <field name="line_type" readonly="1"/>
+                            <field name="parent_line_id" readonly="1"/>
+                            <field name="number" readonly="1"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group>
+                            <field name="owner_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                            <field name="target_type"/>
+                            <field name="progress_status"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="topic" placeholder="Contoh: Status Hardware"/>
+                        <field name="discussion" placeholder="Isi pembahasan sub item..."/>
+                        <field name="progress_note" placeholder="Update teks bebas lama (opsional)..."/>
+                        <group string="Checklist Update">
+                            <field name="update_checklist_ids" context="{'default_check_type': 'update'}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="check_type" column_invisible="1"/>
+                                    <field name="content" string="Item Update"/>
+                                </list>
+                            </field>
+                        </group>
+                        <group string="Checklist Note">
+                            <field name="note_checklist_ids" context="{'default_check_type': 'note'}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="check_type" column_invisible="1"/>
+                                    <field name="content" string="Item Note"/>
+                                </list>
+                            </field>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" special="save" class="btn-primary"/>
+                    <button string="Discard" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_np_meeting_minutes" model="ir.actions.act_window">
+        <field name="name">Notulen Meeting</field>
+        <field name="res_model">np.meeting.minutes</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_np_meeting_minutes_list"/>
+        <field name="search_view_id" ref="view_np_meeting_minutes_search"/>
+    </record>
+
+    <record id="action_np_meeting_minutes_line_change" model="ir.actions.act_window">
+        <field name="name">Riwayat Perubahan Notulen</field>
+        <field name="res_model">np.meeting.minutes.line.change</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_np_meeting_minutes_line_change_list"/>
+    </record>
+
+    <menuitem id="menu_np_meeting_minutes_root" name="Notulen Meeting" action="action_np_meeting_minutes" sequence="35"/>
+    <menuitem id="menu_np_meeting_minutes_changes" name="Riwayat Perubahan" parent="menu_np_meeting_minutes_root" action="action_np_meeting_minutes_line_change" sequence="20"/>
+</odoo>
