@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_project" model="ir.ui.view">
+        <field name="name">project.project.list.wbs</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.view_project" />
+        <field name="arch" type="xml">
+            <field name="name" position="before">
+                <field name="complete_wbs_code" string="Code" optional="show" />
+            </field>
+            <field name="name" position="after">
+                <field name="account_class" string="Class" optional="show" />
+                <field name="project_analytic_id" optional="hide" />
+            </field>
+            <button name="action_view_tasks" position="before">
+                <button
+                    title="Parent WBS element"
+                    name="action_open_parent_tree_view"
+                    type="object"
+                    icon="fa-arrow-up"
+                />
+                <button
+                    title="Child WBS elements"
+                    name="action_open_child_tree_view"
+                    type="object"
+                    icon="fa-arrow-down"
+                />
+            </button>
+        </field>
+    </record>
+
+    <record id="view_project_project_filter" model="ir.ui.view">
+        <field name="name">project.project.search.wbs</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.view_project_project_filter" />
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="complete_wbs_code" string="WBS Code" />
+                <field name="account_class" string="Class" />
+                <field name="project_analytic_id" />
+            </field>
+            <xpath expr="//group" position="inside">
+                <filter
+                    string="Class"
+                    name="group_by_account_class"
+                    context="{'group_by': 'account_class'}"
+                />
+                <filter
+                    string="Master Project"
+                    name="group_by_project_analytic_id"
+                    context="{'group_by': 'project_analytic_id'}"
+                />
+            </xpath>
+        </field>
+    </record>
+
+    <record id="create_wbs_element" model="ir.actions.act_window">
+        <field name="name">WBS Elements</field>
+        <field name="res_model">project.project</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{'default_allow_timesheets': True}</field>
+    </record>
+
+    <record id="edit_project" model="ir.ui.view">
+        <field name="name">project.project.form.wbs</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.edit_project" />
+        <field name="arch" type="xml">
+            <field name="name" position="attributes">
+                <attribute name="string">WBS Element Name</attribute>
+            </field>
+            <xpath expr="//group[@name='analytic']" position="inside">
+                <field
+                    name="parent_id"
+                    string="Parent Analytic Account"
+                    domain="[('id', '!=', account_id)]"
+                    context="{'current_model': 'project.project'}"
+                />
+                <field name="account_class" string="Class" />
+                <field name="code" string="Code" />
+                <field name="complete_wbs_code" string="WBS Code" readonly="1" />
+                <field name="project_analytic_id" />
+            </xpath>
+            <xpath expr="//field[@name='account_id']" position="attributes">
+                <attribute name="readonly">1</attribute>
+            </xpath>
+            <notebook position="inside">
+                <page string="Work Breakdown Structure" name="wbs">
+                    <group>
+                        <button
+                            name="%(create_wbs_element)d"
+                            string="Create Child WBS Element"
+                            type="action"
+                            context="{'default_parent_id': account_id, 'default_partner_id': partner_id, 'default_user_id': user_id}"
+                        />
+                    </group>
+                    <field name="project_child_complete_ids" nolabel="1">
+                        <list>
+                            <field name="complete_wbs_code" string="Code" />
+                            <field name="name" />
+                            <field name="account_class" />
+                            <field name="user_id" />
+                        </list>
+                    </field>
+                </page>
+            </notebook>
+        </field>
+    </record>
+
+    <record id="open_view_wbs_kanban" model="ir.actions.act_window">
+        <field name="name">WBS Elements</field>
+        <field name="res_model">project.project</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="view_id" ref="project.view_project_kanban" />
+        <field name="search_view_id" ref="project.view_project_project_filter" />
+        <field name="context">{'search_default_current': 1}</field>
+        <field name="domain">[]</field>
+    </record>
+
+    <record id="open_view_project_wbs" model="ir.actions.act_window">
+        <field name="name">WBS Elements</field>
+        <field name="res_model">project.project</field>
+        <field name="domain">[]</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="project.view_project" />
+        <field name="search_view_id" ref="project.view_project_project_filter" />
+        <field name="context">{'search_default_current': 1}</field>
+    </record>
+
+    <record id="group_project" model="ir.actions.act_window">
+        <field name="name">Projects</field>
+        <field name="res_model">project.project</field>
+        <field name="domain">[('account_class', '=', 'project')]</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="view_id" ref="project.view_project_kanban" />
+        <field name="search_view_id" ref="project.view_project_project_filter" />
+        <field name="context">{'search_default_current': 1, 'default_account_class': 'project'}</field>
+    </record>
+
+    <record id="open_view_project_phases" model="ir.actions.act_window">
+        <field name="name">Phases</field>
+        <field name="res_model">project.project</field>
+        <field name="domain">[('account_class', '=', 'phase')]</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="view_id" ref="project.view_project_kanban" />
+        <field name="search_view_id" ref="project.view_project_project_filter" />
+        <field name="context">{'search_default_current': 1, 'default_account_class': 'phase'}</field>
+    </record>
+
+    <record id="open_view_project_deliverables" model="ir.actions.act_window">
+        <field name="name">Deliverables</field>
+        <field name="res_model">project.project</field>
+        <field name="domain">[('account_class', '=', 'deliverable')]</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="view_id" ref="project.view_project_kanban" />
+        <field name="search_view_id" ref="project.view_project_project_filter" />
+        <field name="context">{'search_default_current': 1, 'default_account_class': 'deliverable'}</field>
+    </record>
+
+    <record id="open_view_project_work_packages" model="ir.actions.act_window">
+        <field name="name">Work Packages</field>
+        <field name="res_model">project.project</field>
+        <field name="domain">[('account_class', '=', 'work_package')]</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="view_id" ref="project.view_project_kanban" />
+        <field name="search_view_id" ref="project.view_project_project_filter" />
+        <field name="context">{'search_default_current': 1, 'default_account_class': 'work_package'}</field>
+    </record>
+
+    <menuitem
+        action="open_view_project_wbs"
+        id="menu_project_wbs_project"
+        name="WBS"
+        parent="project.menu_main_pm"
+        sequence="1"
+    />
+</odoo>
