@@ -9,7 +9,7 @@
     """,
     "category": "Productivity",
     "author": "Nihki Prihadi",
-    "license": "LGPL-3",
+    "license": "OPL-1",
     "depends": [
         "base",
         "hr",
