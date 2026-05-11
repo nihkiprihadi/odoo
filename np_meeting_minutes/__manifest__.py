@@ -10,6 +10,8 @@
     "category": "Productivity",
     "author": "Nihki Prihadi",
     "license": "OPL-1",
+    "price": 49.99,
+    "currency": "USD",
     "depends": [
         "base",
         "hr",
