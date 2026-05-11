@@ -236,6 +236,33 @@
             gap: 14px;
         }
 
+        .previews {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .preview {
+            padding: 14px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+        }
+
+        .preview img {
+            width: 100%;
+            display: block;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: #fff;
+        }
+
+        .preview strong {
+            display: block;
+            margin: 0 0 10px;
+            font-size: 15px;
+        }
+
         .step {
             position: relative;
             padding: 18px 18px 18px 54px;
@@ -285,7 +312,8 @@
             .features,
             .workflow,
             .hero-points,
-            .stats {
+            .stats,
+            .previews {
                 grid-template-columns: 1fr;
             }
 
@@ -428,6 +456,23 @@
                     <div class="step-num">4</div>
                     <strong>Follow Up Meeting</strong>
                     <span>Buat meeting lanjutan dan teruskan open item untuk monitoring berikutnya.</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel section">
+            <h2>Preview Tampilan</h2>
+            <p>
+                Contoh tampilan form notulen dan Print Web yang siap dipakai saat rapat, review, maupun presentasi lewat proyektor.
+            </p>
+            <div class="previews">
+                <div class="preview">
+                    <strong>Form Notulen Meeting</strong>
+                    <img src="preview_form.png" alt="Preview form notulen meeting" />
+                </div>
+                <div class="preview">
+                    <strong>Print Web Notulen</strong>
+                    <img src="preview_print_web.png" alt="Preview print web notulen meeting" />
                 </div>
             </div>
         </section>
