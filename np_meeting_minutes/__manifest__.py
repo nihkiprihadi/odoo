@@ -9,7 +9,6 @@
     """,
     "category": "Productivity",
     "author": "Nihki Prihadi",
-    "website": "https://github.com/nihkiprihadi/np_meeting_minutes",
     "license": "LGPL-3",
     "depends": [
         "base",

@@ -42,6 +42,7 @@
                             .np-mm-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
                             .np-mm-table th, .np-mm-table td { border: 1px solid #000000; padding: 4px 5px; vertical-align: top; }
                             .np-mm-table th { background: #ffffff; text-align: center; font-weight: 700; }
+                            .np-mm-col-center { text-align: center; vertical-align: middle; }
                             .np-mm-section td { font-weight: 700; text-transform: uppercase; background: #ffffff; }
                             .np-mm-section__desc { display: block; margin-top: 3px; font-weight: 400; text-transform: none; white-space: pre-line; }
                             .np-mm-no { width: 5%; text-align: center; }
@@ -50,14 +51,14 @@
                             .np-mm-status { width: 11%; text-align: center; }
                             .np-mm-cell-pre { white-space: pre-line; }
                             .np-mm-row--parent td { background: #fcfcfc; }
-                            .np-mm-parent-title { font-weight: 700; text-transform: uppercase; margin-bottom: 1px; }
+                            .np-mm-parent-title { font-weight: 400; text-transform: none; margin-bottom: 1px; }
                             .np-mm-parent-note { white-space: pre-line; }
                             .np-mm-child td { border-top: 0 !important; border-bottom: 0 !important; }
                             .np-mm-child--last td { border-bottom: 1px solid #000 !important; }
-                            .np-mm-outline { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; margin-top: 0; }
+                            .np-mm-outline { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: auto; margin-top: 0; }
                             .np-mm-outline td { border: 0 !important; outline: 0 !important; box-shadow: none !important; padding: 0; vertical-align: top; }
-                            .np-mm-outline__marker { width: 18px; font-weight: 700; }
-                            .np-mm-outline__topic { font-weight: 700; }
+                            .np-mm-outline__marker { width: 1%; font-weight: 400; white-space: nowrap; word-break: keep-all; }
+                            .np-mm-outline__topic { font-weight: 400; }
                             .np-mm-outline__bulletrow { display: table; width: 100%; table-layout: fixed; border: 0 !important; outline: 0 !important; margin: 0; }
                             .np-mm-outline__bulletmarker { display: table-cell; width: 10px; padding-right: 6px; padding-top: 1px; vertical-align: top; line-height: 1.2; }
                             .np-mm-outline__bullettext { display: table-cell; white-space: pre-line; vertical-align: top; line-height: 1.35; }
@@ -95,7 +96,7 @@
                                 </tr>
                                 <tr>
                                     <td class="np-mm-meta__label">Notulis</td>
-                                    <td class="np-mm-meta__value">: <span t-esc="o.note_taker_id.name or '-'"/></td>
+                                    <td class="np-mm-meta__value">: <span t-esc="o.get_note_taker_display()"/></td>
                                     <td class="np-mm-meta__label"></td>
                                     <td class="np-mm-meta__value"></td>
                                 </tr>
@@ -185,11 +186,11 @@
                                                         <span t-esc="line.change_summary"/>
                                                     </div>
                                                 </td>
-                                                <td>
+                                                <td class="np-mm-col-center">
                                                     <span t-esc="line.owner_names or ''"/>
                                                 </td>
-                                                <td><span t-esc="line._get_target_label() or ''"/></td>
-                                                <td><span t-esc="line._get_progress_status_label() or ''"/></td>
+                                                <td class="np-mm-col-center"><span t-esc="line._get_target_label() or ''"/></td>
+                                                <td class="np-mm-col-center"><span t-esc="line._get_progress_status_label() or ''"/></td>
                                             </tr>
                                             <tr
                                                 t-if="outline_rows"
@@ -203,23 +204,15 @@
                                                         <tr>
                                                             <td
                                                                 class="np-mm-outline__marker"
-                                                                t-att-style="'width:%spx; padding-left:%spx; padding-right:%spx;' % (((10 if row['marker'] == '\\u2022' else 18)), ((6 + ((row['level'] - 2) * 8)) if row['marker'] == '\\u2022' else ((row['level'] - 1) * 14)), (2 if row['marker'] == '\\u2022' else 6))"
+                                                                t-att-style="'white-space:nowrap; padding-left:%spx; padding-right:10px;' % ((row['level'] - 1) * 14)"
                                                             >
-                                                                <span t-if="row['marker'] != '\u2022'" t-esc="row['marker']"/>
+                                                                <span t-esc="row['marker']"/>
                                                             </td>
                                                             <td>
-                                                                <div class="np-mm-outline__topic" t-if="row['marker'] != '\u2022'">
+                                                                <div class="np-mm-outline__topic">
                                                                     <span t-esc="row['topic']"/>
                                                                 </div>
-                                                                <div class="np-mm-outline__bulletrow" t-if="row['marker'] == '\u2022'">
-                                                                    <span class="np-mm-outline__bulletmarker">&#8226;</span>
-                                                                    <span class="np-mm-outline__bullettext">
-                                                                        <span t-if="row['topic']" t-esc="row['topic']"/>
-                                                                        <span t-if="row['topic'] and row['discussion']"> </span>
-                                                                        <span t-if="row['discussion']" t-esc="row['discussion']"/>
-                                                                    </span>
-                                                                </div>
-                                                                <div class="np-mm-outline__text" t-if="row['discussion'] and row['marker'] != '\u2022'">
+                                                                <div class="np-mm-outline__text" t-if="row['discussion']">
                                                                     <span t-esc="row['discussion']"/>
                                                                 </div>
                                                                 <t t-if="row['has_table']">
@@ -243,7 +236,7 @@
                                                                         </tbody>
                                                                     </table>
                                                                 </t>
-                                                                <div class="np-mm-progress" t-if="row['update_items'] or row['progress_note']" t-att-style="'padding-left:%spx;' % (14 if row['marker'] == '\u2022' else 2)">
+                                                                <div class="np-mm-progress" t-if="row['update_items'] or row['progress_note']" style="padding-left:2px;">
                                                                     <strong>Update:</strong>
                                                                     <br/>
                                                                     <t t-if="row['update_items']">
@@ -256,7 +249,7 @@
                                                                         <span t-esc="row['progress_note']"/>
                                                                     </t>
                                                                 </div>
-                                                                <div class="np-mm-progress" t-if="row['note_items']" t-att-style="'padding-left:%spx;' % (14 if row['marker'] == '\u2022' else 2)">
+                                                                <div class="np-mm-progress" t-if="row['note_items']" style="padding-left:2px;">
                                                                     <strong>Note:</strong>
                                                                     <br/>
                                                                     <div class="np-mm-checklist-row" t-foreach="row['note_items']" t-as="note_item">
@@ -273,9 +266,9 @@
                                                         </tr>
                                                     </table>
                                                 </td>
-                                                <td><span t-esc="row['owner'] or ''"/></td>
-                                                <td><span t-if="row['is_leaf']" t-esc="row['target']"/></td>
-                                                <td><span t-if="row['is_leaf']" t-esc="row['status']"/></td>
+                                                <td class="np-mm-col-center"><span t-esc="row['owner'] or ''"/></td>
+                                                <td class="np-mm-col-center"><span t-if="row['is_leaf']" t-esc="row['target']"/></td>
+                                                <td class="np-mm-col-center"><span t-if="row['is_leaf']" t-esc="row['status']"/></td>
                                             </tr>
                                         </t>
                                     </t>
@@ -310,19 +303,20 @@
                 .np-mm-web-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
                 .np-mm-web-table th, .np-mm-web-table td { border: 1px solid #222; padding: 5px 6px; vertical-align: top; font-size: 13px; }
                 .np-mm-web-table th { background: #d9d9d9; text-align: center; font-weight: 700; }
+                .np-mm-web-col-center { text-align: center; vertical-align: middle; }
                 .np-mm-web-section td { font-weight: 700; text-transform: uppercase; }
                 .np-mm-web-section__desc { display: block; margin-top: 3px; font-weight: 400; text-transform: none; white-space: pre-line; }
                 .np-mm-web-no { width: 6%; text-align: center; }
                 .np-mm-web-owner { width: 12%; }
                 .np-mm-web-target { width: 12%; text-align: center; }
                 .np-mm-web-status { width: 12%; text-align: center; }
-                .np-mm-web-parent { font-weight: 700; text-transform: uppercase; }
+                .np-mm-web-parent { font-weight: 400; text-transform: none; }
                 .np-mm-web-child td { border-top: 0 !important; border-bottom: 0 !important; }
                 .np-mm-web-child--last td { border-bottom: 1px solid #222 !important; }
-                .np-mm-web-outline { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 0; }
+                .np-mm-web-outline { width: 100%; border-collapse: collapse; table-layout: auto; margin-top: 0; }
                 .np-mm-web-outline td { border: 0 !important; padding: 1px 0 0 0; vertical-align: top; }
-                .np-mm-web-outline__marker { width: 22px; font-weight: 700; }
-                .np-mm-web-outline__topic { font-weight: 700; }
+                .np-mm-web-outline__marker { width: 1%; font-weight: 400; white-space: nowrap; word-break: keep-all; }
+                .np-mm-web-outline__topic { font-weight: 400; }
                 .np-mm-web-outline__text { white-space: pre-line; margin-top: 2px; }
                 .np-mm-web-gap { display: block; min-height: 18px; }
                 .np-mm-web-update { margin-top: -2px; margin-bottom: 0; white-space: pre-line; }
@@ -377,7 +371,7 @@
                         </tr>
                         <tr>
                             <td class="np-mm-web-meta__label">Notulis</td>
-                            <td><span t-esc="o.note_taker_id.name or '-'"/></td>
+                            <td><span t-esc="o.get_note_taker_display()"/></td>
                             <td class="np-mm-web-meta__label">No. Notulen</td>
                             <td><span t-esc="o.name or '-'"/></td>
                         </tr>
@@ -445,9 +439,9 @@
                                             </div>
                                         </div>
                                     </td>
-                                    <td><span t-esc="line.owner_names or ''"/></td>
-                                    <td><span t-esc="line._get_target_label() or ''"/></td>
-                                    <td><span t-esc="line._get_progress_status_label() or ''"/></td>
+                                    <td class="np-mm-web-col-center"><span t-esc="line.owner_names or ''"/></td>
+                                    <td class="np-mm-web-col-center"><span t-esc="line._get_target_label() or ''"/></td>
+                                    <td class="np-mm-web-col-center"><span t-esc="line._get_progress_status_label() or ''"/></td>
                                 </tr>
                                 <tr
                                     t-if="line.line_type == 'item' and not line.parent_line_id and outline_rows"
@@ -461,7 +455,7 @@
                                             <tr>
                                                 <td
                                                     class="np-mm-web-outline__marker"
-                                                    t-att-style="'width:%spx; padding-left:%spx; padding-right:%spx;' % (((12 if row['marker'] == '\\u2022' else 22)), ((18 + ((row['level'] - 2) * 10)) if row['marker'] == '\\u2022' else ((row['level'] - 1) * 14)), (4 if row['marker'] == '\\u2022' else 6))"
+                                                    t-att-style="'white-space:nowrap; padding-left:%spx; padding-right:10px;' % ((row['level'] - 1) * 14)"
                                                 >
                                                     <span t-esc="row['marker']"/>
                                                 </td>
@@ -506,9 +500,9 @@
                                             </tr>
                                         </table>
                                     </td>
-                                    <td><span t-esc="row['owner'] or ''"/></td>
-                                    <td><span t-if="row['is_leaf']" t-esc="row['target']"/></td>
-                                    <td><span t-if="row['is_leaf']" t-esc="row['status']"/></td>
+                                    <td class="np-mm-web-col-center"><span t-esc="row['owner'] or ''"/></td>
+                                    <td class="np-mm-web-col-center"><span t-if="row['is_leaf']" t-esc="row['target']"/></td>
+                                    <td class="np-mm-web-col-center"><span t-if="row['is_leaf']" t-esc="row['status']"/></td>
                                 </tr>
                             </t>
                         </tbody>

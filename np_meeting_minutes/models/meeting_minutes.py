@@ -166,7 +166,23 @@ class MeetingMinutes(models.Model):
     @api.depends("participant_ids")
     def _compute_participant_names(self):
         for rec in self:
-            rec.participant_names = ", ".join(rec.participant_ids.mapped("name"))
+            rec.participant_names = ", ".join(
+                "%s (%s)" % (participant.name, participant.initial_name)
+                if participant.initial_name
+                else participant.name
+                for participant in rec.participant_ids
+            )
+
+    def get_note_taker_display(self):
+        self.ensure_one()
+        if not self.note_taker_id:
+            return "-"
+        if self.note_taker_id.initial_name:
+            return "%s (%s)" % (
+                self.note_taker_id.name,
+                self.note_taker_id.initial_name,
+            )
+        return self.note_taker_id.name
 
     def _get_department_manager_approver(self):
         self.ensure_one()
@@ -216,9 +232,7 @@ class MeetingMinutes(models.Model):
         "state",
         "note_taker_id",
         "participant_ids",
-        "requested_by",
         "approver_id",
-        "department_id.manager_id.user_id",
     )
     @api.depends_context("uid")
     def _compute_permissions(self):
@@ -226,18 +240,19 @@ class MeetingMinutes(models.Model):
             is_admin = self.env.user.has_group("np_meeting_minutes.group_meeting_minutes_admin")
             effective_approver = rec._get_effective_approver()
             is_note_taker = rec.note_taker_id.user_id == self.env.user
-            is_owner = rec.requested_by == self.env.user
+            is_participant = self.env.user in rec.participant_ids.mapped("user_id")
+            is_approver = effective_approver == self.env.user
             can_approve = bool(
                 is_admin
                 or (
-                    effective_approver == self.env.user
+                    is_approver
                     and rec.state == "waiting_approval"
                 )
             )
             can_edit = bool(
                 is_admin
                 or (
-                    (is_note_taker or is_owner)
+                    (is_note_taker or is_participant or is_approver)
                     and rec.state in ("draft", "rejected")
                 )
             )
@@ -245,8 +260,19 @@ class MeetingMinutes(models.Model):
             rec.can_edit_meeting = can_edit
             rec.can_submit_approval = bool(can_edit and rec.line_ids)
             rec.can_approve = can_approve
-            rec.can_reset = bool(is_admin or is_note_taker or is_owner)
+            rec.can_reset = bool(is_admin or is_note_taker or is_approver)
             rec.can_carry_forward = bool(can_edit and rec._has_pending_carry_forward_items())
+
+    def _is_current_user_collaborator(self):
+        self.ensure_one()
+        if self.env.user.has_group("np_meeting_minutes.group_meeting_minutes_admin"):
+            return True
+        effective_approver = self._get_effective_approver()
+        return bool(
+            self.note_taker_id.user_id == self.env.user
+            or self.env.user in self.participant_ids.mapped("user_id")
+            or effective_approver == self.env.user
+        )
 
     @api.constrains("start_time", "end_time")
     def _check_time_range(self):
@@ -316,11 +342,20 @@ class MeetingMinutes(models.Model):
             if rec.is_admin:
                 continue
             is_note_taker = rec.note_taker_id.user_id == self.env.user
-            is_owner = rec.requested_by == self.env.user
-            if not (is_note_taker or is_owner):
-                raise AccessError(_("Hanya notulis atau pembuat meeting yang dapat mengubah data ini."))
+            is_participant = self.env.user in rec.participant_ids.mapped("user_id")
+            is_approver = rec._get_effective_approver() == self.env.user
+            if not (is_note_taker or is_participant or is_approver):
+                raise AccessError(_("Hanya notulis, peserta, atau approver yang dapat mengubah data ini."))
             if rec.state not in ("draft", "rejected"):
                 raise UserError(_("Meeting yang sudah disubmit tidak dapat diubah langsung."))
+
+    def unlink(self):
+        for rec in self:
+            if rec.is_admin:
+                continue
+            if not rec._is_current_user_collaborator():
+                raise AccessError(_("Hanya notulis, peserta, atau approver yang dapat menghapus data ini."))
+        return super().unlink()
 
     def _ensure_submit_requirements(self):
         for rec in self:
@@ -377,7 +412,7 @@ class MeetingMinutes(models.Model):
             agenda=escape(self.agenda or "-"),
             department=escape(self.department_id.display_name or "-"),
             meeting_date=escape(meeting_date),
-            note_taker=escape(self.note_taker_id.name or "-"),
+            note_taker=escape(self.get_note_taker_display()),
             link_html=(
                 '<p><a href="%s">Buka Notulen Meeting</a></p>' % escape(meeting_url)
                 if meeting_url
@@ -792,7 +827,7 @@ class MeetingMinutes(models.Model):
         sheet.write(row, 1, self.location or "-")
         row += 1
         sheet.write(row, 0, "Notulis")
-        sheet.write(row, 1, self.note_taker_id.name or "-")
+        sheet.write(row, 1, self.get_note_taker_display())
         row += 1
         sheet.write(row, 0, "Peserta")
         sheet.write(row, 1, self.participant_names or "-")
@@ -941,7 +976,7 @@ class MeetingMinutes(models.Model):
                     left_number = 22 + ((outline_row["level"] - 1) * 16)
                     left_body = 22 + ((outline_row["level"] - 1) * 16)
                     child_parts = [
-                        "<div style='margin-top:5px; padding-left:%spx;'><span style='display:inline-block; width:18px; font-weight:700; vertical-align:top;'>%s</span><span style='display:inline-block; width:calc(100%% - 24px); font-weight:700; vertical-align:top;'>%s</span></div>"
+                        "<div style='margin-top:5px; padding-left:%spx;'><span style='display:inline-block; white-space:nowrap; vertical-align:top; padding-right:10px;'>%s</span><span style='display:inline; vertical-align:top;'>%s</span></div>"
                         % (left_number, escape(outline_row["marker"] or ""), escape(outline_row["topic"] or "")),
                     ]
                     if outline_row["discussion"]:
@@ -1127,7 +1162,7 @@ class MeetingMinutes(models.Model):
             meeting_date=escape(self.get_meeting_date_display()),
             meeting_time=escape(self.get_meeting_time_display()),
             location=escape(self.location or "-"),
-            note_taker=escape(self.note_taker_id.name or "-"),
+            note_taker=escape(self.get_note_taker_display()),
             participants=escape(self.participant_names or "-"),
             rows="".join(rows_html),
         )
@@ -1416,7 +1451,9 @@ class MeetingMinutesLine(models.Model):
     @api.depends("owner_ids")
     def _compute_owner_names(self):
         for rec in self:
-            rec.owner_names = ", ".join(rec.owner_ids.mapped("name"))
+            rec.owner_names = ", ".join(
+                owner.initial_name or owner.name for owner in rec.owner_ids
+            )
 
     @api.depends("line_type", "number", "section_title", "topic")
     def _compute_line_name(self):
@@ -1504,8 +1541,11 @@ class MeetingMinutesLine(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        editable_meetings = self.env["np.meeting.minutes"]
         records_to_number = self.browse()
         for vals in vals_list:
+            if vals.get("meeting_id"):
+                editable_meetings |= self.env["np.meeting.minutes"].browse(vals["meeting_id"])
             vals.setdefault("status", False)
             if vals.get("line_type", "item") != "item":
                 continue
@@ -1513,11 +1553,13 @@ class MeetingMinutesLine(models.Model):
                 continue
             temp_record = self.new(vals)
             vals["number"] = temp_record._generate_next_number()
+        editable_meetings._ensure_can_edit()
         records = super().create(vals_list)
         records._create_change_logs_for_create()
         return records
 
     def write(self, vals):
+        self.mapped("meeting_id")._ensure_can_edit(vals)
         if "target_type" in vals or "progress_status" in vals:
             vals.setdefault("status", False)
         tracked_fields = {
@@ -1544,6 +1586,10 @@ class MeetingMinutesLine(models.Model):
         if before_map:
             self._create_change_logs_for_write(before_map)
         return result
+
+    def unlink(self):
+        self.mapped("meeting_id")._ensure_can_edit()
+        return super().unlink()
 
     def _generate_next_number(self):
         self.ensure_one()
@@ -1862,7 +1908,7 @@ class MeetingMinutesLine(models.Model):
         for child in self.get_sorted_child_lines():
             relative_level = child.get_nesting_level() - base_level
             last_segment = (child.number or "").split(".")[-1] if child.number else ""
-            marker = ("%s." % last_segment) if relative_level == 1 else "\u2022"
+            marker = child.number or ("%s." % last_segment if last_segment else "")
             is_leaf = not bool(child.child_line_ids)
             rows.append(
                 {
@@ -1987,6 +2033,21 @@ class MeetingMinutesLineChecklist(models.Model):
     )
     content = fields.Text(string="Isi", required=True)
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        self.env["np.meeting.minutes.line"].browse(
+            [vals["line_id"] for vals in vals_list if vals.get("line_id")]
+        ).mapped("meeting_id")._ensure_can_edit()
+        return super().create(vals_list)
+
+    def write(self, vals):
+        self.mapped("meeting_id")._ensure_can_edit(vals)
+        return super().write(vals)
+
+    def unlink(self):
+        self.mapped("meeting_id")._ensure_can_edit()
+        return super().unlink()
+
 
 class MeetingMinutesLineTableRow(models.Model):
     _name = "np.meeting.minutes.line.table.row"
@@ -2019,3 +2080,18 @@ class MeetingMinutesLineTableRow(models.Model):
     col_4 = fields.Char(string="Kolom 4")
     col_5 = fields.Char(string="Kolom 5")
     col_6 = fields.Char(string="Kolom 6")
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        self.env["np.meeting.minutes.line"].browse(
+            [vals["line_id"] for vals in vals_list if vals.get("line_id")]
+        ).mapped("meeting_id")._ensure_can_edit()
+        return super().create(vals_list)
+
+    def write(self, vals):
+        self.mapped("meeting_id")._ensure_can_edit(vals)
+        return super().write(vals)
+
+    def unlink(self):
+        self.mapped("meeting_id")._ensure_can_edit()
+        return super().unlink()
