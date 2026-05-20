@@ -14,6 +14,7 @@
     "currency": "USD",
     "depends": [
         "base",
+        "calendar",
         "hr",
         "mail",
     ],
@@ -29,5 +30,5 @@
         "static/description/banner.png",
     ],
     "installable": True,
-    "application": True,
+    "application": False,
 }

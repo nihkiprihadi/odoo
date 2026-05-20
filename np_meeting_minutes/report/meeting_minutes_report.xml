@@ -296,6 +296,11 @@
                 .np-mm-web-stage__inner { width: max-content; min-width: 100%; margin: 0 auto; display: flex; justify-content: center; }
                 .np-mm-web-sheet { width: 980px; margin: 0 auto; background: #ffffff; color: #111111; font-family: Arial, sans-serif; box-shadow: 0 8px 30px rgba(0,0,0,0.08); padding: 28px 30px 36px; transform: scale(var(--np-mm-web-scale)); transform-origin: top center; transition: transform 0.15s ease; }
                 .np-mm-web-title { text-align: center; font-size: 22px; font-weight: 700; margin: 0 0 16px; }
+                .np-mm-web-review-box { border: 1px solid #222; padding: 12px 14px; margin: 0 0 16px; background: #fafafa; font-size: 13px; }
+                .np-mm-web-review-box__title { font-weight: 700; margin-bottom: 8px; }
+                .np-mm-web-review-box__success { margin-top: 8px; color: #0c6b2f; font-weight: 700; }
+                .np-mm-web-review-box textarea { width: 100%; min-height: 84px; margin-top: 8px; padding: 8px; border: 1px solid #999; font-family: Arial, sans-serif; font-size: 13px; box-sizing: border-box; }
+                .np-mm-web-review-box button { margin-top: 8px; }
                 .np-mm-web-meta { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
                 .np-mm-web-meta td { border: 1px solid #222; padding: 4px 6px; font-size: 13px; vertical-align: top; }
                 .np-mm-web-meta__label { width: 18%; font-weight: 700; }
@@ -349,12 +354,32 @@
                         <span class="np-mm-web-zoom" id="np-mm-web-zoom-label">100%</span>
                     </div>
                     <div class="np-mm-web-toolbar__group">
-                        <a class="np-mm-web-btn" t-att-href="'/report/pdf/np_meeting_minutes.report_np_meeting_minutes_document/%s' % o.id">Download PDF</a>
+                        <a
+                            class="np-mm-web-btn"
+                            t-if="not is_public"
+                            t-att-href="'/report/pdf/np_meeting_minutes.report_np_meeting_minutes_document/%s' % o.id"
+                        >Download PDF</a>
                     </div>
                 </div>
                 <div class="np-mm-web-stage" id="np-mm-web-stage">
                 <div class="np-mm-web-stage__inner">
                 <div class="np-mm-web-sheet" id="np-mm-web-sheet">
+                    <div class="np-mm-web-review-box" t-if="is_public and reviewer">
+                        <div class="np-mm-web-review-box__title">Reviewer: <span t-esc="reviewer.get_reviewer_display_name()"/></div>
+                        <div>Status Review: <strong><span t-esc="dict(reviewer._fields['review_status'].selection).get(reviewer.review_status, reviewer.review_status)"/></strong></div>
+                        <div t-if="reviewer.reviewed_date">Tanggal Review: <span t-esc="reviewer.reviewed_date"/></div>
+                        <div t-if="request.params.get('reviewed')" class="np-mm-web-review-box__success">Review berhasil disimpan.</div>
+                        <form t-if="reviewer.review_status != 'reviewed'" t-att-action="'/np_meeting_minutes/reviewer/%s/review/%s' % (reviewer.id, reviewer.access_token)" method="post">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <label for="review_note"><strong>Catatan Review</strong></label>
+                            <textarea id="review_note" name="review_note" placeholder="Tulis catatan review jika ada..."><t t-esc="reviewer.review_note or ''"/></textarea>
+                            <button class="np-mm-web-btn" type="submit">Saya Sudah Review</button>
+                        </form>
+                        <div t-elif="reviewer.review_note">
+                            <strong>Catatan Review:</strong>
+                            <div><span t-esc="reviewer.review_note"/></div>
+                        </div>
+                    </div>
                     <h1 class="np-mm-web-title">NOTULEN RAPAT</h1>
                     <table class="np-mm-web-meta">
                         <tr>

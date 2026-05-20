@@ -2,7 +2,9 @@
 
 import base64
 import io
+import json
 import re
+import secrets
 from datetime import timedelta
 from html import escape
 
@@ -27,6 +29,14 @@ class MeetingMinutes(models.Model):
     )
     title = fields.Char(string="Judul Rapat", required=True, tracking=True)
     agenda = fields.Char(string="Agenda", tracking=True)
+    calendar_event_id = fields.Many2one(
+        "calendar.event",
+        string="Calendar Meeting",
+        ondelete="set null",
+        readonly=True,
+        tracking=True,
+        copy=False,
+    )
     meeting_date = fields.Date(
         string="Tanggal",
         required=True,
@@ -64,6 +74,28 @@ class MeetingMinutes(models.Model):
     participant_names = fields.Text(
         string="Peserta",
         compute="_compute_participant_names",
+    )
+    reviewer_ids = fields.One2many(
+        "np.meeting.minutes.reviewer",
+        "meeting_id",
+        string="PIC Reviewer",
+        copy=True,
+    )
+    reviewer_total_count = fields.Integer(
+        string="Total Reviewer",
+        compute="_compute_reviewer_summary",
+    )
+    reviewer_reviewed_count = fields.Integer(
+        string="Sudah Review",
+        compute="_compute_reviewer_summary",
+    )
+    reviewer_pending_count = fields.Integer(
+        string="Belum Review",
+        compute="_compute_reviewer_summary",
+    )
+    reviewer_summary = fields.Char(
+        string="Ringkasan Reviewer",
+        compute="_compute_reviewer_summary",
     )
     line_ids = fields.One2many(
         "np.meeting.minutes.line",
@@ -173,6 +205,21 @@ class MeetingMinutes(models.Model):
                 for participant in rec.participant_ids
             )
 
+    @api.depends("reviewer_ids", "reviewer_ids.review_status")
+    def _compute_reviewer_summary(self):
+        for rec in self:
+            total = len(rec.reviewer_ids)
+            reviewed = len(rec.reviewer_ids.filtered(lambda reviewer: reviewer.review_status == "reviewed"))
+            pending = total - reviewed
+            rec.reviewer_total_count = total
+            rec.reviewer_reviewed_count = reviewed
+            rec.reviewer_pending_count = pending
+            rec.reviewer_summary = (
+                _("%s/%s reviewer sudah review") % (reviewed, total)
+                if total
+                else _("Belum ada reviewer")
+            )
+
     def get_note_taker_display(self):
         self.ensure_one()
         if not self.note_taker_id:
@@ -183,6 +230,12 @@ class MeetingMinutes(models.Model):
                 self.note_taker_id.initial_name,
             )
         return self.note_taker_id.name
+
+    def _get_internal_reviewer_users(self):
+        self.ensure_one()
+        return self.reviewer_ids.filtered(
+            lambda reviewer: reviewer.reviewer_type == "internal" and reviewer.user_id
+        ).mapped("user_id")
 
     def _get_department_manager_approver(self):
         self.ensure_one()
@@ -233,6 +286,7 @@ class MeetingMinutes(models.Model):
         "note_taker_id",
         "participant_ids",
         "approver_id",
+        "reviewer_ids",
     )
     @api.depends_context("uid")
     def _compute_permissions(self):
@@ -242,6 +296,7 @@ class MeetingMinutes(models.Model):
             is_note_taker = rec.note_taker_id.user_id == self.env.user
             is_participant = self.env.user in rec.participant_ids.mapped("user_id")
             is_approver = effective_approver == self.env.user
+            is_internal_reviewer = self.env.user in rec._get_internal_reviewer_users()
             can_approve = bool(
                 is_admin
                 or (
@@ -326,6 +381,8 @@ class MeetingMinutes(models.Model):
 
     def _ensure_can_edit(self, vals=False):
         vals = vals or {}
+        if self.env.context.get("skip_calendar_meeting_minutes_access"):
+            return
         bypass_fields = {
             "state",
             "approved_by",
@@ -363,6 +420,14 @@ class MeetingMinutes(models.Model):
                 raise UserError(_("Notulis wajib diisi."))
             if not rec.department_id:
                 raise UserError(_("Divisi wajib diisi."))
+            missing_reviewer_email = rec.reviewer_ids.filtered(
+                lambda reviewer: not reviewer.get_reviewer_email()
+            )
+            if missing_reviewer_email:
+                raise UserError(
+                    _("Email wajib diisi untuk PIC reviewer berikut: %s")
+                    % ", ".join(missing_reviewer_email.mapped("display_name"))
+                )
             effective_approver = rec._get_effective_approver()
             if not effective_approver and not rec.department_id.manager_id:
                 raise UserError(_("Manager divisi belum diatur pada divisi ini."))
@@ -435,6 +500,77 @@ class MeetingMinutes(models.Model):
             }
         ).send()
 
+    def _send_reviewer_notifications(self):
+        self.ensure_one()
+        base_url = self.env["ir.config_parameter"].sudo().get_param("web.base.url", "")
+        meeting_url = "%s/web#id=%s&model=np.meeting.minutes&view_type=form" % (
+            base_url.rstrip("/"),
+            self.id,
+        ) if base_url else ""
+        meeting_date = self._format_indonesian_date(self.meeting_date) if self.meeting_date else "-"
+        notified_names = []
+        for reviewer in self.reviewer_ids.sorted(key=lambda item: (item.sequence, item.id)):
+            recipient_email = (reviewer.get_reviewer_email() or "").strip()
+            if not recipient_email:
+                continue
+            notified_names.append(reviewer.get_reviewer_display_name())
+            subject = _("Review Notulen Meeting %s [%s: %s]") % (
+                self.name or self.title or "",
+                _("Internal") if reviewer.reviewer_type == "internal" else _("External"),
+                reviewer.get_reviewer_display_name() or "-",
+            )
+            public_review_url = reviewer.get_public_review_url()
+            public_link_html = (
+                '<p><a href="%s">Buka Notulen Meeting</a></p>' % escape(public_review_url)
+                if public_review_url
+                else ""
+            )
+            odoo_link_html = (
+                '<p><a href="%s">Buka di Odoo</a></p>' % escape(meeting_url)
+                if meeting_url and reviewer.user_id
+                else ""
+            )
+            body_html = """
+                <p>Yth. {reviewer_name},</p>
+                <p>Mohon meninjau notulen meeting berikut sebelum approval final:</p>
+                <ul>
+                    <li><strong>No. Notulen:</strong> {name}</li>
+                    <li><strong>Judul:</strong> {title}</li>
+                    <li><strong>Agenda:</strong> {agenda}</li>
+                    <li><strong>Divisi:</strong> {department}</li>
+                    <li><strong>Tanggal:</strong> {meeting_date}</li>
+                    <li><strong>Notulis:</strong> {note_taker}</li>
+                </ul>
+                <p>Silakan cek isi notulen dan koordinasikan jika ada koreksi yang diperlukan.</p>
+                {link_html}
+            """.format(
+                reviewer_name=escape(reviewer.get_reviewer_display_name() or "-"),
+                name=escape(self.name or "-"),
+                title=escape(self.title or "-"),
+                agenda=escape(self.agenda or "-"),
+                department=escape(self.department_id.display_name or "-"),
+                meeting_date=escape(meeting_date),
+                note_taker=escape(self.get_note_taker_display()),
+                link_html="%s%s" % (public_link_html, odoo_link_html),
+            )
+            mail_vals = {
+                "subject": subject,
+                "body_html": body_html,
+                "email_to": recipient_email,
+                "model": self._name,
+                "res_id": self.id,
+                "auto_delete": False,
+            }
+            if reviewer.user_id and reviewer.user_id.partner_id:
+                mail_vals["recipient_ids"] = [(4, reviewer.user_id.partner_id.id)]
+            self.env["mail.mail"].sudo().create(mail_vals).send()
+
+        if notified_names:
+            self.message_post(
+                body=_("Permintaan review dikirim ke PIC: %s") % ", ".join(notified_names),
+                subtype_xmlid="mail.mt_note",
+            )
+
     def _ensure_can_approve(self):
         for rec in self:
             if rec.is_admin:
@@ -459,6 +595,7 @@ class MeetingMinutes(models.Model):
                 }
             )
             rec._send_submit_approval_notification()
+            rec._send_reviewer_notifications()
         return True
 
     def action_approve(self):
@@ -626,34 +763,13 @@ class MeetingMinutes(models.Model):
                 if section_candidates:
                     new_sequence = max(section_candidates) + 1
                 new_line = line_model.create(
-                    {
-                        "meeting_id": rec.id,
-                        "sequence": new_sequence,
-                        "line_type": "item",
-                        "number": source_line.number,
-                        "topic": source_line.topic,
-                        "discussion": source_line.discussion,
-                        "owner_ids": [(6, 0, source_line.owner_ids.ids)],
-                        "parent_line_id": created_line_map.get(source_line.parent_line_id.id),
-                        "target_type": source_line._get_target_value(),
-                        "progress_status": source_line._get_progress_status_value(),
-                        "status": source_line.status,
-                        "progress_note": source_line.progress_note,
-                        "checklist_item_ids": [
-                            (
-                                0,
-                                0,
-                                {
-                                    "sequence": item.sequence,
-                                    "check_type": item.check_type,
-                                    "content": item.content,
-                                },
-                            )
-                            for item in source_line.checklist_item_ids.sorted(key=lambda item: (item.check_type, item.sequence, item.id))
-                        ],
-                        "previous_line_id": source_line.id,
-                        "carried_forward": True,
-                    }
+                    rec._prepare_follow_up_line_vals(
+                        source_line,
+                        parent_line_id=created_line_map.get(source_line.parent_line_id.id),
+                        previous_line_id=source_line.id,
+                        sequence=new_sequence,
+                        number=source_line.number,
+                    )
                 )
                 created_line_map[source_line.id] = new_line.id
             rec._rebuild_follow_up_structure()
@@ -721,40 +837,107 @@ class MeetingMinutes(models.Model):
                     "parent_line_id": parent_line.id if parent_line else False,
                 }
                 if target_line:
+                    if source_line.has_table_content():
+                        structural_vals.update(rec._prepare_follow_up_table_vals(source_line))
                     target_line.write(structural_vals)
                     continue
 
                 new_line = line_model.create(
-                    {
-                        "meeting_id": rec.id,
-                        "sequence": source_line.sequence,
-                        "line_type": "item",
-                        "number": source_line.number,
-                        "topic": source_line.topic,
-                        "discussion": source_line.discussion,
-                        "owner_ids": [(6, 0, source_line.owner_ids.ids)],
-                        "parent_line_id": parent_line.id if parent_line else False,
-                        "target_type": source_line._get_target_value(),
-                        "progress_status": source_line._get_progress_status_value(),
-                        "status": source_line.status,
-                        "progress_note": source_line.progress_note,
-                        "checklist_item_ids": [
-                            (
-                                0,
-                                0,
-                                {
-                                    "sequence": item.sequence,
-                                    "check_type": item.check_type,
-                                    "content": item.content,
-                                },
-                            )
-                            for item in source_line.checklist_item_ids.sorted(key=lambda item: (item.check_type, item.sequence, item.id))
-                        ],
-                        "previous_line_id": source_line.id,
-                        "carried_forward": True,
-                    }
+                    rec._prepare_follow_up_line_vals(
+                        source_line,
+                        parent_line_id=parent_line.id if parent_line else False,
+                        previous_line_id=source_line.id,
+                        sequence=source_line.sequence,
+                        number=source_line.number,
+                    )
                 )
                 source_to_current[source_line.id] = new_line
+
+    def _prepare_follow_up_table_vals(self, source_line):
+        self.ensure_one()
+        if not source_line.use_table:
+            return {
+                "use_table": False,
+                "table_title": False,
+                "table_col_1_label": False,
+                "table_col_2_label": False,
+                "table_col_3_label": False,
+                "table_col_4_label": False,
+                "table_col_5_label": False,
+                "table_col_6_label": False,
+                "table_row_ids": [(5, 0, 0)],
+            }
+        return {
+            "use_table": True,
+            "table_title": source_line.table_title,
+            "table_col_1_label": source_line.table_col_1_label,
+            "table_col_2_label": source_line.table_col_2_label,
+            "table_col_3_label": source_line.table_col_3_label,
+            "table_col_4_label": source_line.table_col_4_label,
+            "table_col_5_label": source_line.table_col_5_label,
+            "table_col_6_label": source_line.table_col_6_label,
+            "table_row_ids": [
+                (5, 0, 0),
+                *[
+                    (
+                        0,
+                        0,
+                        {
+                            "sequence": row.sequence,
+                            "col_1": row.col_1,
+                            "col_2": row.col_2,
+                            "col_3": row.col_3,
+                            "col_4": row.col_4,
+                            "col_5": row.col_5,
+                            "col_6": row.col_6,
+                        },
+                    )
+                    for row in source_line.table_row_ids.sorted(key=lambda row: (row.sequence, row.id))
+                ],
+            ],
+        }
+
+    def _prepare_follow_up_line_vals(
+        self,
+        source_line,
+        parent_line_id=False,
+        previous_line_id=False,
+        sequence=False,
+        number=False,
+    ):
+        self.ensure_one()
+        vals = {
+            "meeting_id": self.id,
+            "sequence": sequence if sequence is not False else source_line.sequence,
+            "line_type": "item",
+            "number": number if number is not False else source_line.number,
+            "topic": source_line.topic,
+            "discussion": source_line.discussion,
+            "owner_ids": [(6, 0, source_line.owner_ids.ids)],
+            "parent_line_id": parent_line_id or False,
+            "target_type": source_line._get_target_value(),
+            "progress_status": source_line._get_progress_status_value(),
+            "status": source_line.status,
+            "progress_note": source_line.progress_note,
+            "checklist_item_ids": [
+                (
+                    0,
+                    0,
+                    {
+                        "sequence": item.sequence,
+                        "check_type": item.check_type,
+                        "content": item.content,
+                    },
+                )
+                for item in source_line.checklist_item_ids.sorted(
+                    key=lambda item: (item.check_type, item.sequence, item.id)
+                )
+            ],
+            "previous_line_id": previous_line_id or False,
+            "carried_forward": True,
+        }
+        vals.update(self._prepare_follow_up_table_vals(source_line))
+        return vals
 
     def action_rebuild_follow_up_structure(self):
         for rec in self:
@@ -1303,6 +1486,507 @@ class MeetingMinutes(models.Model):
             html_parts.append("</tr>")
         html_parts.append("</tbody></table>")
         return "".join(html_parts)
+
+
+class MeetingMinutesBackupWizard(models.TransientModel):
+    _name = "np.meeting.minutes.backup.wizard"
+    _description = "Backup Data Notulen Meeting"
+
+    include_change_logs = fields.Boolean(
+        string="Sertakan Riwayat Perubahan",
+        default=True,
+    )
+    meeting_count = fields.Integer(string="Jumlah Meeting", readonly=True)
+    backup_file = fields.Binary(string="Backup File", readonly=True)
+    backup_filename = fields.Char(string="Filename", readonly=True)
+    generated_at = fields.Datetime(string="Generated At", readonly=True)
+
+    def _serialize_user_ref(self, user):
+        if not user:
+            return False
+        return {
+            "id": user.id,
+            "login": user.login,
+            "email": user.email,
+            "name": user.name,
+        }
+
+    def _serialize_employee_ref(self, employee):
+        if not employee:
+            return False
+        return {
+            "id": employee.id,
+            "name": employee.name,
+            "work_email": employee.work_email,
+            "initial_name": employee.initial_name,
+            "user": self._serialize_user_ref(employee.user_id),
+        }
+
+    def _serialize_department_ref(self, department):
+        if not department:
+            return False
+        return {
+            "id": department.id,
+            "name": department.name,
+        }
+
+    def _serialize_line(self, meeting, line, include_change_logs):
+        backup_key = "%s::%s" % (meeting.name or meeting.id, line.id)
+        return {
+            "backup_key": backup_key,
+            "sequence": line.sequence,
+            "line_type": line.line_type,
+            "number": line.number,
+            "section_title": line.section_title,
+            "topic": line.topic,
+            "discussion": line.discussion,
+            "use_table": line.use_table,
+            "table_title": line.table_title,
+            "table_col_1_label": line.table_col_1_label,
+            "table_col_2_label": line.table_col_2_label,
+            "table_col_3_label": line.table_col_3_label,
+            "table_col_4_label": line.table_col_4_label,
+            "table_col_5_label": line.table_col_5_label,
+            "table_col_6_label": line.table_col_6_label,
+            "owner_refs": [self._serialize_employee_ref(owner) for owner in line.owner_ids],
+            "target_type": line.target_type,
+            "progress_status": line.progress_status,
+            "status": line.status,
+            "progress_note": line.progress_note,
+            "carried_forward": line.carried_forward,
+            "parent_backup_key": (
+                "%s::%s" % (meeting.name or meeting.id, line.parent_line_id.id)
+                if line.parent_line_id
+                else False
+            ),
+            "previous_backup_key": (
+                "%s::%s" % (
+                    line.previous_line_id.meeting_id.name or line.previous_line_id.meeting_id.id,
+                    line.previous_line_id.id,
+                )
+                if line.previous_line_id
+                else False
+            ),
+            "checklists": [
+                {
+                    "sequence": item.sequence,
+                    "check_type": item.check_type,
+                    "content": item.content,
+                }
+                for item in line.checklist_item_ids.sorted(
+                    key=lambda item: (item.check_type, item.sequence, item.id)
+                )
+            ],
+            "table_rows": [
+                {
+                    "sequence": row.sequence,
+                    "col_1": row.col_1,
+                    "col_2": row.col_2,
+                    "col_3": row.col_3,
+                    "col_4": row.col_4,
+                    "col_5": row.col_5,
+                    "col_6": row.col_6,
+                }
+                for row in line.table_row_ids.sorted(key=lambda row: (row.sequence, row.id))
+            ],
+            "change_logs": [
+                {
+                    "change_type": change.change_type,
+                    "user": self._serialize_user_ref(change.user_id),
+                    "message": change.message,
+                    "old_status": change.old_status,
+                    "new_status": change.new_status,
+                    "old_target_type": change.old_target_type,
+                    "new_target_type": change.new_target_type,
+                }
+                for change in line.change_log_ids.sorted(key=lambda change: (change.create_date or fields.Datetime.now(), change.id))
+            ] if include_change_logs else [],
+        }
+
+    def _serialize_meeting(self, meeting, include_change_logs):
+        return {
+            "name": meeting.name,
+            "title": meeting.title,
+            "agenda": meeting.agenda,
+            "meeting_date": meeting.meeting_date.isoformat() if meeting.meeting_date else False,
+            "start_time": meeting.start_time,
+            "end_time": meeting.end_time,
+            "location": meeting.location,
+            "department": self._serialize_department_ref(meeting.department_id),
+            "note_taker": self._serialize_employee_ref(meeting.note_taker_id),
+            "participants": [self._serialize_employee_ref(employee) for employee in meeting.participant_ids],
+            "reviewers": [
+                {
+                    "sequence": reviewer.sequence,
+                    "reviewer_type": reviewer.reviewer_type,
+                    "employee": self._serialize_employee_ref(reviewer.employee_id),
+                    "external_name": reviewer.external_name,
+                    "email": reviewer.email,
+                    "company_name": reviewer.company_name,
+                    "role": reviewer.role,
+                    "review_status": reviewer.review_status,
+                    "review_note": reviewer.review_note,
+                }
+                for reviewer in meeting.reviewer_ids.sorted(key=lambda reviewer: (reviewer.sequence, reviewer.id))
+            ],
+            "requested_by": self._serialize_user_ref(meeting.requested_by),
+            "approver": self._serialize_user_ref(meeting.approver_id),
+            "approved_by": self._serialize_user_ref(meeting.approved_by),
+            "approved_date": meeting.approved_date.isoformat() if meeting.approved_date else False,
+            "rejected_by": self._serialize_user_ref(meeting.rejected_by),
+            "rejected_date": meeting.rejected_date.isoformat() if meeting.rejected_date else False,
+            "approval_note": meeting.approval_note,
+            "state": meeting.state,
+            "carry_forward_source_name": meeting.carry_forward_source_id.name or False,
+            "lines": [
+                self._serialize_line(meeting, line, include_change_logs)
+                for line in meeting.line_ids.sorted(key=lambda line: (line.sequence, line.id))
+            ],
+        }
+
+    def action_generate_backup(self):
+        self.ensure_one()
+        meetings = self.env["np.meeting.minutes"].sudo().search([], order="meeting_date, id")
+        payload = {
+            "meta": {
+                "module": "np_meeting_minutes",
+                "version": "19.0",
+                "generated_at": fields.Datetime.now().isoformat(),
+                "generated_by": self.env.user.name,
+                "meeting_count": len(meetings),
+            },
+            "meetings": [
+                self._serialize_meeting(meeting, self.include_change_logs)
+                for meeting in meetings
+            ],
+        }
+        content = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+        filename = "np_meeting_minutes_backup_%s.json" % fields.Datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.write(
+            {
+                "meeting_count": len(meetings),
+                "backup_file": base64.b64encode(content),
+                "backup_filename": filename,
+                "generated_at": fields.Datetime.now(),
+            }
+        )
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Back Up Data"),
+            "res_model": self._name,
+            "res_id": self.id,
+            "view_mode": "form",
+            "target": "new",
+        }
+
+
+class MeetingMinutesRestoreWizard(models.TransientModel):
+    _name = "np.meeting.minutes.restore.wizard"
+    _description = "Restore Data Notulen Meeting"
+
+    restore_file = fields.Binary(string="Backup File", required=True)
+    restore_filename = fields.Char(string="Filename")
+    replace_existing = fields.Boolean(
+        string="Update jika No. Notulen sudah ada",
+        default=True,
+        help="Jika dicentang, data dengan No. Notulen yang sama akan diperbarui. Jika tidak, meeting yang sudah ada akan dilewati.",
+    )
+    result_message = fields.Text(string="Hasil Restore", readonly=True)
+
+    def _to_date(self, value):
+        if not value:
+            return False
+        return fields.Date.to_date(value)
+
+    def _to_datetime(self, value):
+        if not value:
+            return False
+        return fields.Datetime.to_datetime(value)
+
+    def _resolve_user(self, ref):
+        if not ref:
+            return self.env["res.users"]
+        user_model = self.env["res.users"].sudo()
+        user_id = ref.get("id")
+        if user_id:
+            user = user_model.browse(user_id)
+            if user.exists():
+                return user
+        for field_name in ("login", "email", "name"):
+            value = ref.get(field_name)
+            if value:
+                user = user_model.search([(field_name, "=", value)], limit=1)
+                if user:
+                    return user
+        return user_model.browse()
+
+    def _resolve_department(self, ref):
+        if not ref:
+            return self.env["hr.department"]
+        dept_model = self.env["hr.department"].sudo()
+        dept_id = ref.get("id")
+        if dept_id:
+            department = dept_model.browse(dept_id)
+            if department.exists():
+                return department
+        if ref.get("name"):
+            return dept_model.search([("name", "=", ref["name"])], limit=1)
+        return dept_model.browse()
+
+    def _resolve_employee(self, ref):
+        if not ref:
+            return self.env["hr.employee"]
+        employee_model = self.env["hr.employee"].sudo()
+        employee_id = ref.get("id")
+        if employee_id:
+            employee = employee_model.browse(employee_id)
+            if employee.exists():
+                return employee
+        work_email = ref.get("work_email")
+        if work_email:
+            employee = employee_model.search([("work_email", "=", work_email)], limit=1)
+            if employee:
+                return employee
+        user_ref = ref.get("user")
+        if user_ref:
+            user = self._resolve_user(user_ref)
+            if user:
+                employee = employee_model.search([("user_id", "=", user.id)], limit=1)
+                if employee:
+                    return employee
+        name = ref.get("name")
+        if name:
+            employee = employee_model.search([("name", "=", name)], limit=1)
+            if employee:
+                return employee
+        return employee_model.browse()
+
+    def _prepare_meeting_vals(self, data):
+        department = self._resolve_department(data.get("department"))
+        note_taker = self._resolve_employee(data.get("note_taker"))
+        participant_ids = [
+            employee.id
+            for employee in (self._resolve_employee(ref) for ref in data.get("participants", []))
+            if employee
+        ]
+        reviewer_commands = []
+        for reviewer_data in data.get("reviewers", []):
+            reviewer_commands.append((0, 0, self._prepare_reviewer_vals(reviewer_data)))
+        return {
+            "name": data.get("name") or _("New"),
+            "title": data.get("title") or _("Notulen Meeting"),
+            "agenda": data.get("agenda"),
+            "meeting_date": self._to_date(data.get("meeting_date")),
+            "start_time": data.get("start_time") or 0.0,
+            "end_time": data.get("end_time") or 0.0,
+            "location": data.get("location"),
+            "department_id": department.id if department else False,
+            "note_taker_id": note_taker.id if note_taker else False,
+            "participant_ids": [(6, 0, participant_ids)],
+            "reviewer_ids": reviewer_commands,
+            "requested_by": self._resolve_user(data.get("requested_by")).id or self.env.user.id,
+            "approver_id": self._resolve_user(data.get("approver")).id or False,
+            "approved_by": self._resolve_user(data.get("approved_by")).id or False,
+            "approved_date": self._to_datetime(data.get("approved_date")),
+            "rejected_by": self._resolve_user(data.get("rejected_by")).id or False,
+            "rejected_date": self._to_datetime(data.get("rejected_date")),
+            "approval_note": data.get("approval_note"),
+            "state": data.get("state") or "draft",
+        }
+
+    def _prepare_reviewer_vals(self, data):
+        reviewer_type = data.get("reviewer_type") or "internal"
+        employee = self._resolve_employee(data.get("employee"))
+        vals = {
+            "sequence": data.get("sequence") or 10,
+            "reviewer_type": reviewer_type,
+            "employee_id": employee.id if reviewer_type == "internal" and employee else False,
+            "external_name": data.get("external_name") or False,
+            "email": data.get("email") or False,
+            "company_name": data.get("company_name") or False,
+            "role": data.get("role") or False,
+            "review_status": data.get("review_status") or "pending",
+            "review_note": data.get("review_note") or False,
+        }
+        if reviewer_type == "internal" and employee:
+            vals["email"] = data.get("email") or employee.work_email or employee.user_id.email or False
+        return vals
+
+    def _restore_line_logs(self, line, change_logs):
+        change_model = self.env["np.meeting.minutes.line.change"].sudo()
+        for change_data in change_logs:
+            change_model.create(
+                {
+                    "meeting_id": line.meeting_id.id,
+                    "line_id": line.id,
+                    "change_type": change_data.get("change_type") or "update",
+                    "user_id": self._resolve_user(change_data.get("user")).id or self.env.user.id,
+                    "message": change_data.get("message") or _("Restored change log"),
+                    "old_status": change_data.get("old_status") or False,
+                    "new_status": change_data.get("new_status") or False,
+                    "old_target_type": change_data.get("old_target_type") or False,
+                    "new_target_type": change_data.get("new_target_type") or False,
+                }
+            )
+
+    def _restore_meeting_lines(self, meeting, meeting_data, global_line_map, pending_previous_links):
+        line_model = self.env["np.meeting.minutes.line"]
+        created_line_map = {}
+        payload_by_line_id = {}
+
+        for line_data in meeting_data.get("lines", []):
+            owner_ids = [
+                employee.id
+                for employee in (self._resolve_employee(ref) for ref in line_data.get("owner_refs", []))
+                if employee
+            ]
+            line = line_model.create(
+                {
+                    "meeting_id": meeting.id,
+                    "sequence": line_data.get("sequence") or 10,
+                    "line_type": line_data.get("line_type") or "item",
+                    "number": line_data.get("number") or False,
+                    "section_title": line_data.get("section_title") or False,
+                    "topic": line_data.get("topic") or False,
+                    "discussion": line_data.get("discussion") or False,
+                    "use_table": bool(line_data.get("use_table")),
+                    "table_title": line_data.get("table_title") or False,
+                    "table_col_1_label": line_data.get("table_col_1_label") or False,
+                    "table_col_2_label": line_data.get("table_col_2_label") or False,
+                    "table_col_3_label": line_data.get("table_col_3_label") or False,
+                    "table_col_4_label": line_data.get("table_col_4_label") or False,
+                    "table_col_5_label": line_data.get("table_col_5_label") or False,
+                    "table_col_6_label": line_data.get("table_col_6_label") or False,
+                    "owner_ids": [(6, 0, owner_ids)],
+                    "target_type": line_data.get("target_type") or False,
+                    "progress_status": line_data.get("progress_status") or False,
+                    "status": line_data.get("status") or False,
+                    "progress_note": line_data.get("progress_note") or False,
+                    "carried_forward": bool(line_data.get("carried_forward")),
+                    "checklist_item_ids": [
+                        (
+                            0,
+                            0,
+                            {
+                                "sequence": item.get("sequence") or 10,
+                                "check_type": item.get("check_type") or "update",
+                                "content": item.get("content") or "",
+                            },
+                        )
+                        for item in line_data.get("checklists", [])
+                    ],
+                    "table_row_ids": [
+                        (
+                            0,
+                            0,
+                            {
+                                "sequence": row.get("sequence") or 10,
+                                "col_1": row.get("col_1") or False,
+                                "col_2": row.get("col_2") or False,
+                                "col_3": row.get("col_3") or False,
+                                "col_4": row.get("col_4") or False,
+                                "col_5": row.get("col_5") or False,
+                                "col_6": row.get("col_6") or False,
+                            },
+                        )
+                        for row in line_data.get("table_rows", [])
+                    ],
+                }
+            )
+            backup_key = line_data.get("backup_key")
+            if backup_key:
+                created_line_map[backup_key] = line
+                global_line_map[backup_key] = line
+            payload_by_line_id[line.id] = line_data
+
+        for line in created_line_map.values():
+            line_data = payload_by_line_id.get(line.id, {})
+            vals = {}
+            parent_key = line_data.get("parent_backup_key")
+            previous_key = line_data.get("previous_backup_key")
+            if parent_key and created_line_map.get(parent_key):
+                vals["parent_line_id"] = created_line_map[parent_key].id
+            if vals:
+                line.write(vals)
+            if previous_key:
+                pending_previous_links.append((line, previous_key))
+            self._restore_line_logs(line, line_data.get("change_logs", []))
+
+    def action_restore_backup(self):
+        self.ensure_one()
+        if not self.restore_file:
+            raise UserError(_("Silakan unggah file backup terlebih dahulu."))
+        try:
+            payload = json.loads(base64.b64decode(self.restore_file).decode("utf-8"))
+        except Exception as exc:
+            raise UserError(_("File backup tidak valid atau bukan format backup notulen.")) from exc
+
+        meeting_rows = payload.get("meetings", [])
+        if not isinstance(meeting_rows, list):
+            raise UserError(_("Struktur file backup tidak valid: daftar meeting tidak ditemukan."))
+
+        meeting_model = self.env["np.meeting.minutes"].with_context(
+            tracking_disable=True,
+            mail_create_nosubscribe=True,
+        )
+        restored_meetings = {}
+        created_count = 0
+        updated_count = 0
+        skipped_count = 0
+
+        for meeting_data in meeting_rows:
+            meeting_name = meeting_data.get("name")
+            existing = meeting_model.search([("name", "=", meeting_name)], limit=1) if meeting_name else self.env["np.meeting.minutes"]
+            if existing and not self.replace_existing:
+                restored_meetings[meeting_name] = existing
+                skipped_count += 1
+                continue
+            vals = self._prepare_meeting_vals(meeting_data)
+            if existing:
+                existing.write(vals)
+                existing.line_ids.unlink()
+                meeting = existing
+                updated_count += 1
+            else:
+                meeting = meeting_model.create(vals)
+                created_count += 1
+            restored_meetings[meeting_name] = meeting
+
+        for meeting_data in meeting_rows:
+            meeting = restored_meetings.get(meeting_data.get("name"))
+            if not meeting:
+                continue
+            source_name = meeting_data.get("carry_forward_source_name")
+            if source_name and restored_meetings.get(source_name):
+                meeting.write({"carry_forward_source_id": restored_meetings[source_name].id})
+
+        global_line_map = {}
+        pending_previous_links = []
+        for meeting_data in meeting_rows:
+            meeting = restored_meetings.get(meeting_data.get("name"))
+            if meeting:
+                self._restore_meeting_lines(meeting, meeting_data, global_line_map, pending_previous_links)
+
+        for line, previous_key in pending_previous_links:
+            previous_line = global_line_map.get(previous_key)
+            if previous_line:
+                line.write({"previous_line_id": previous_line.id})
+
+        self.result_message = _(
+            "Restore selesai. Meeting dibuat: %(created)s, diperbarui: %(updated)s, dilewati: %(skipped)s."
+        ) % {
+            "created": created_count,
+            "updated": updated_count,
+            "skipped": skipped_count,
+        }
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Restore Data"),
+            "res_model": self._name,
+            "res_id": self.id,
+            "view_mode": "form",
+            "target": "new",
+        }
 
 
 class MeetingMinutesLine(models.Model):
@@ -1999,6 +2683,176 @@ class MeetingMinutesLineChange(models.Model):
     new_status = fields.Selection(MeetingMinutesLine.PROGRESS_STATUS_SELECTION, string="Status Baru")
     old_target_type = fields.Selection(MeetingMinutesLine.TARGET_SELECTION, string="Target Lama")
     new_target_type = fields.Selection(MeetingMinutesLine.TARGET_SELECTION, string="Target Baru")
+
+
+class MeetingMinutesReviewer(models.Model):
+    _name = "np.meeting.minutes.reviewer"
+    _description = "PIC Reviewer Notulen Meeting"
+    _order = "meeting_id, sequence, id"
+
+    REVIEWER_TYPE_SELECTION = [
+        ("internal", "Internal"),
+        ("external", "External"),
+    ]
+    REVIEW_STATUS_SELECTION = [
+        ("pending", "Pending Review"),
+        ("reviewed", "Reviewed"),
+    ]
+
+    meeting_id = fields.Many2one(
+        "np.meeting.minutes",
+        string="Meeting",
+        required=True,
+        ondelete="cascade",
+    )
+    sequence = fields.Integer(default=10)
+    reviewer_type = fields.Selection(
+        REVIEWER_TYPE_SELECTION,
+        string="Tipe PIC",
+        required=True,
+        default="internal",
+    )
+    employee_id = fields.Many2one("hr.employee", string="PIC Internal")
+    user_id = fields.Many2one(
+        "res.users",
+        string="User Internal",
+        related="employee_id.user_id",
+        store=True,
+        readonly=True,
+    )
+    external_name = fields.Char(string="Nama PIC Eksternal")
+    email = fields.Char(string="Email")
+    company_name = fields.Char(string="Divisi / Instansi")
+    role = fields.Char(string="Peran / Keterangan")
+    access_token = fields.Char(
+        string="Access Token",
+        copy=False,
+        readonly=True,
+        default=lambda self: self._generate_access_token(),
+    )
+    review_status = fields.Selection(
+        REVIEW_STATUS_SELECTION,
+        string="Status Review",
+        default="pending",
+        required=True,
+    )
+    reviewed_date = fields.Datetime(string="Tanggal Review", readonly=True)
+    review_note = fields.Text(string="Catatan Review")
+    display_name = fields.Char(compute="_compute_display_name")
+
+    @api.depends("reviewer_type", "employee_id", "external_name")
+    def _compute_display_name(self):
+        for rec in self:
+            rec.display_name = rec.get_reviewer_display_name()
+
+    @api.model
+    def _generate_access_token(self):
+        return secrets.token_urlsafe(24)
+
+    @api.onchange("reviewer_type")
+    def _onchange_reviewer_type(self):
+        for rec in self:
+            if rec.reviewer_type == "internal":
+                rec.external_name = False
+            else:
+                rec.employee_id = False
+
+    @api.onchange("employee_id")
+    def _onchange_employee_id(self):
+        for rec in self:
+            if rec.employee_id:
+                rec.email = rec.employee_id.work_email or rec.employee_id.user_id.email or rec.email
+                rec.company_name = rec.employee_id.department_id.display_name or rec.company_name
+
+    def get_reviewer_display_name(self):
+        self.ensure_one()
+        if self.reviewer_type == "internal" and self.employee_id:
+            return self.employee_id.name
+        return self.external_name or "-"
+
+    def get_reviewer_email(self):
+        self.ensure_one()
+        if self.reviewer_type == "internal" and self.employee_id:
+            return self.email or self.employee_id.work_email or self.employee_id.user_id.email or False
+        return self.email or False
+
+    def get_public_review_url(self):
+        self.ensure_one()
+        if not self.access_token:
+            self.sudo().write({"access_token": self._generate_access_token()})
+        base_url = self.env["ir.config_parameter"].sudo().get_param("web.base.url", "")
+        if not base_url:
+            return False
+        return "%s/np_meeting_minutes/reviewer/%s/open/%s" % (
+            base_url.rstrip("/"),
+            self.id,
+            self.access_token,
+        )
+
+    def action_mark_reviewed_public(self, note=False):
+        self.ensure_one()
+        vals = {
+            "review_status": "reviewed",
+            "reviewed_date": fields.Datetime.now(),
+        }
+        if note is not False:
+            vals["review_note"] = note or False
+        self.sudo().write(vals)
+        message = _("PIC reviewer %s menandai review selesai.") % (
+            self.get_reviewer_display_name() or "-"
+        )
+        if note:
+            message += "<br/><strong>%s</strong><br/>%s" % (
+                _("Catatan Review:"),
+                escape(note),
+            )
+        self.meeting_id.sudo().message_post(
+            body=message,
+            subtype_xmlid="mail.mt_note",
+        )
+
+    @api.model
+    def _normalize_reviewer_vals(self, vals, record=None):
+        vals = dict(vals)
+        reviewer_type = vals.get("reviewer_type") or (record.reviewer_type if record else "internal")
+        employee_id = vals.get("employee_id")
+        employee = False
+        if employee_id:
+            employee = self.env["hr.employee"].browse(employee_id)
+        elif record and reviewer_type == "internal":
+            employee = record.employee_id
+
+        if reviewer_type == "internal":
+            if "reviewer_type" in vals or "employee_id" in vals:
+                vals["external_name"] = False
+            if employee:
+                if not vals.get("email"):
+                    vals["email"] = employee.work_email or employee.user_id.email or False
+                if not vals.get("company_name"):
+                    vals["company_name"] = employee.department_id.display_name or False
+        else:
+            if "reviewer_type" in vals:
+                vals["employee_id"] = False
+            if record is None and "employee_id" not in vals:
+                vals["employee_id"] = False
+        return vals
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        vals_list = [self._normalize_reviewer_vals(vals) for vals in vals_list]
+        self.env["np.meeting.minutes"].browse(
+            [vals["meeting_id"] for vals in vals_list if vals.get("meeting_id")]
+        )._ensure_can_edit()
+        return super().create(vals_list)
+
+    def write(self, vals):
+        vals = self._normalize_reviewer_vals(vals, record=self[:1] if self else None)
+        self.mapped("meeting_id")._ensure_can_edit(vals)
+        return super().write(vals)
+
+    def unlink(self):
+        self.mapped("meeting_id")._ensure_can_edit()
+        return super().unlink()
 
 
 class MeetingMinutesLineChecklist(models.Model):

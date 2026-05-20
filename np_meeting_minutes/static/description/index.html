@@ -331,29 +331,32 @@
                 <span class="eyebrow">PTN Productivity</span>
                 <h1>PTN Notulen Meeting</h1>
                 <p class="lead">
-                    Modul notulen meeting Odoo untuk mencatat pembahasan rapat, histori perubahan tiap item,
-                    workflow approval, carry forward meeting lanjutan, serta output presentable ke Print Web, PDF,
-                    Word, dan Excel.
+                    PTN Notulen Meeting membantu tim membuat notulen rapat yang rapi, terstruktur, dan mudah
+                    ditindaklanjuti. Modul ini mendukung pembahasan bertingkat, review lintas pihak, approval,
+                    carry forward meeting berikutnya, serta output siap presentasi ke Print Web, PDF, Word,
+                    dan Excel.
                 </p>
 
                 <div class="hero-points">
                     <div class="point">
                         <strong>Structured Minutes</strong>
-                        <span>Section, topik, sub-item, checklist update, note, dan tabel fleksibel dalam satu alur
-                            input.</span>
+                        <span>Section, topik, sub-item, checklist update, note review, dan tabel fleksibel dalam satu
+                            alur input.</span>
                     </div>
                     <div class="point">
                         <strong>Action Tracking</strong>
-                        <span>Status, target, owner, dan perubahan progres dapat ditelusuri lintas meeting.</span>
+                        <span>Status, target, PIC, dan perubahan progres dapat ditelusuri lintas meeting dengan
+                            lebih jelas.</span>
                     </div>
                     <div class="point">
-                        <strong>Approval Ready</strong>
-                        <span>Submit approval ke approver/manager divisi lengkap dengan notifikasi email.</span>
+                        <strong>Approval & Review</strong>
+                        <span>Submit approval ke approver, reviewer internal, dan reviewer external lengkap dengan
+                            email notifikasi.</span>
                     </div>
                     <div class="point">
                         <strong>Follow Up Flow</strong>
                         <span>Buat meeting lanjutan dan bawa open item otomatis tanpa kehilangan struktur
-                            parent-child.</span>
+                            parent-child maupun data tabel.</span>
                     </div>
                 </div>
             </div>
@@ -397,8 +400,9 @@
         <section class="panel section">
             <h2>Fitur Utama</h2>
             <p>
-                Dirancang untuk rapat internal yang butuh dokumentasi formal sekaligus monitoring progres yang mudah
-                dibaca kembali pada meeting berikutnya.
+                Dirancang untuk kebutuhan rapat internal maupun lintas pihak yang membutuhkan dokumentasi formal,
+                monitoring progres, review sebelum approval, dan jejak perubahan yang mudah dibaca kembali
+                pada meeting berikutnya.
             </p>
             <div class="features">
                 <div class="feature">
@@ -408,13 +412,19 @@
                 </div>
                 <div class="feature">
                     <h3>Approval & Access</h3>
-                    <p>Akses dibatasi berdasarkan pembuat, notulis, peserta, approver, atau manager divisi yang relevan.
+                    <p>Akses dan approval dapat diatur untuk notulis, peserta, approver, reviewer internal, dan admin
+                        sesuai peran yang relevan.
                     </p>
                 </div>
                 <div class="feature">
                     <h3>Histori Perubahan</h3>
                     <p>Setiap item bisa dibandingkan dengan meeting sebelumnya untuk melihat status dan target yang
                         berubah.</p>
+                </div>
+                <div class="feature">
+                    <h3>Reviewer Internal & External</h3>
+                    <p>Tambahkan banyak PIC reviewer dari karyawan internal atau pihak eksternal, lengkap dengan
+                        status review dan catatan review.</p>
                 </div>
                 <div class="feature">
                     <h3>Carry Forward Otomatis</h3>
@@ -428,13 +438,18 @@
                     <h3>Export Multi Format</h3>
                     <p>Dokumen bisa dibagikan ke PDF, Word, dan Excel untuk dokumentasi, distribusi, atau arsip.</p>
                 </div>
+                <div class="feature">
+                    <h3>Backup & Restore</h3>
+                    <p>Backup dan restore data notulen memudahkan migrasi, pemindahan environment, atau pemulihan data.</p>
+                </div>
             </div>
         </section>
 
         <section class="panel section">
             <h2>Workflow Ringkas</h2>
             <p>
-                Alur kerja dibuat sederhana agar tim bisa fokus pada isi rapat, bukan pada administrasi dokumen.
+                Alur kerja dibuat sederhana agar tim bisa fokus pada isi rapat, review antar pihak, dan tindak lanjut,
+                bukan pada administrasi dokumen.
             </p>
             <div class="workflow">
                 <div class="step">
@@ -449,8 +464,8 @@
                 </div>
                 <div class="step">
                     <div class="step-num">3</div>
-                    <strong>Submit Approval</strong>
-                    <span>Kirim notulen ke approver yang ditentukan, termasuk notifikasi email.</span>
+                    <strong>Submit Review & Approval</strong>
+                    <span>Kirim notulen ke approver dan PIC reviewer yang ditentukan, termasuk notifikasi email.</span>
                 </div>
                 <div class="step">
                     <div class="step-num">4</div>
@@ -463,7 +478,8 @@
         <section class="panel section">
             <h2>Preview Tampilan</h2>
             <p>
-                Contoh tampilan form notulen dan Print Web yang siap dipakai saat rapat, review, maupun presentasi lewat proyektor.
+                Berikut beberapa tampilan utama yang menunjukkan bagaimana PTN Notulen Meeting dipakai dalam alur
+                harian: input notulen, pengaturan user, review reviewer, backup/restore, hingga monitoring log email.
             </p>
             <div class="previews">
                 <div class="preview">
@@ -482,11 +498,27 @@
                     <strong>Konfigurasi Role User</strong>
                     <img src="preview_user_roles.png" alt="Preview konfigurasi role user meeting minutes" />
                 </div>
+                <div class="preview">
+                    <strong>Ringkasan PIC Reviewer</strong>
+                    <img src="preview_reviewer_summary.png" alt="Preview ringkasan reviewer meeting minutes" />
+                </div>
+                <div class="preview">
+                    <strong>Review & Catatan Reviewer</strong>
+                    <img src="preview_review_note.png" alt="Preview form review dan catatan reviewer" />
+                </div>
+                <div class="preview">
+                    <strong>Backup & Restore Data</strong>
+                    <img src="preview_backup_restore.png" alt="Preview menu backup dan restore data" />
+                </div>
+                <div class="preview">
+                    <strong>Log Email Reviewer</strong>
+                    <img src="preview_email_log.png" alt="Preview log email reviewer notulen meeting" />
+                </div>
             </div>
         </section>
 
         <div class="footer-note">
-            PTN Notulen Meeting for Odoo 19
+            PTN Notulen Meeting for Odoo 19 | Structured Minutes | Reviewer Workflow | Follow Up Ready
         </div>
     </div>
 </body>
